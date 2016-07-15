@@ -1,0 +1,38 @@
+{
+  "name": "entityjs",
+  "description": "Entity Framework for Node.js",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Prem Ramanathan",
+  "engines": {
+    "node": "~4.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/fieryorc/entityjs.git"
+  },
+  "scripts": {
+    "test": "node test/test-entity.js"
+  },
+  "main": "entityjs.js",
+  "typings": "index.d.ts",
+  "dependencies": {
+    "bluebird": "^3.4.1",
+    "gcloud": "^0.36.0",
+    "lodash": "^4.13.1"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-http": "^1.0.0",
+    "dts-builder": "^1.0.3",
+    "gulp": "^3.9.1",
+    "gulp-concat": "^2.6.0",
+    "gulp-debug": "^2.1.2",
+    "gulp-sourcemaps": "^1.6.0",
+    "gulp-typescript": "^2.13.4",
+    "gulp-util": "^3.0.7",
+    "merge-stream": "^1.0.0",
+    "requirejs": "^2.2.0",
+    "through2": "^2.0.1"
+  }
+}

@@ -1,0 +1,1 @@
+/// <reference path="gcloud/gcloud.d.ts" />
