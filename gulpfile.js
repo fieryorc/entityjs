@@ -26,7 +26,7 @@ gulp.task("build", function () {
 
     var dtsOutput = tsResult.dts
         .pipe(gulp.dest(bindir))
-        .pipe(concat("entityjs.d.ts"))
+        .pipe(concat("index.d.ts"))
         .pipe(gulp.dest(distdir));
 
     var copyFiles = gulp.src(["package.json"])

@@ -187,5 +187,5 @@ export interface PromiseError {
     stack: string;
 }
 
-
-import * as m from "./entityjs";
+// Dummy import to pretend this file to be a module to tsc.
+import * as m from "entityjs";

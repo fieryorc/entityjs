@@ -1,12 +1,9 @@
 {
   "name": "entityjs",
   "description": "Entity Framework for Node.js",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "author": "Prem Ramanathan",
-  "engines": {
-    "node": "~4.2"
-  },
   "repository": {
     "type": "git",
     "url": "git://github.com/fieryorc/entityjs.git"
@@ -14,8 +11,8 @@
   "scripts": {
     "test": "node test/test-entity.js"
   },
-  "main": "entityjs.js",
-  "typings": "entityjs.d.ts",
+  "main": "main.js",
+  "typings": "index.d.ts",
   "dependencies": {
     "bluebird": "^3.4.1",
     "gcloud": "^0.36.0",
