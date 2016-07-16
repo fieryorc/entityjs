@@ -7,7 +7,10 @@
         "experimentalDecorators": true,
         "noImplicitAny": true,
         "sourceMap": true,
-        "declaration": true
+        "declaration": true,
+        "moduleResolution": "node",
+        "outDir": "dist",
+        "emitDecoratorMetadata": true
     },
     "exclude": [
         "node_modules",

@@ -1,8 +1,9 @@
 var through = require('through2');
-var dtsBuilder = require('dts-builder');
 var PluginError = require('gulp-util').PluginError;
 var PLUGIN_NAME = 'gulp-dts';
 var fs = require('fs');
+
+const export_declare = /^export declare/gm;
 
 // file is a vinyl file object
 module.exports = function (destFile, moduleName) {
@@ -16,7 +17,6 @@ module.exports = function (destFile, moduleName) {
     return through.obj(function (file, encoding, callback) {
         // Hack..
         var fileName = sourceDir + "/" + moduleName + ".tmp.d.ts";
-        
         callback(null, file);
     });
 }
