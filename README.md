@@ -3,6 +3,8 @@ EntityJs
 
 A library that provides .net style entity framework for Node.js.
 
+Currently supports Google Cloud store.
+
 Usage
 -----
 
