@@ -1,14 +1,19 @@
 EntityJs
 ========
 
-A library that provides .net style entity framework for Node.js.
-
+A library that provides .net style entity framework for Typescript/Node.js.
 Currently supports Google Cloud store.
+
+Some of the notable features:
+* Typescript decorator based.
+* Supports Google Cloud store.
+* Provides tracking properties of entities.
+* Supports reference entities.
 
 Usage
 -----
 
-  samples can be found under samples directory.
+samples directory contains examples of using entityjs. 
 
 Dev Documentation
 -----------------

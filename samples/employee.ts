@@ -1,4 +1,5 @@
-import { CloudStoreEntity, ValueProperty, ReferenceProperty, PrimaryKeyProperty, DataContext, CloudDataStore} from "../main";
+// You should import "entityjs"
+import { CloudStoreEntity, ValueProperty, ReferenceProperty, PrimaryKeyProperty, DataContext, TempDataStore } from "../main";
 import * as Promise from "bluebird";
 
 /*
@@ -116,7 +117,12 @@ class EmployeeHelper {
     }
 }
 
-var helper = new EmployeeHelper(new DataContext(new CloudDataStore("service-backend-sample")));
+// Create memory based data store.
+var storeBacking = {};
+var helper = new EmployeeHelper(new DataContext(new TempDataStore(storeBacking)));
+// For creating google cloud datatstore, use the following.
+// var helper = new EmployeeHelper(new DataContext(new CloudDataStore("google-project-id")));
+
 helper
     .addEmployee("prem", "Prem Ramanathan")
     .then(() => {
@@ -126,7 +132,7 @@ helper
         return helper.setManager("prem", "prem-boss");
     })
     .then(() => {
-        console.log("All completed successfully");
+        console.log(`All completed successfully. Store = ${JSON.stringify(storeBacking)}`);
     })
     .catch(err => {
         console.error(`Failed ${err}`);
