@@ -4,7 +4,6 @@ declare module CommonTypes {
         [key: string]: T;
     }
 
-    // TODO: Delete
     interface PromiseError {
         message: string;
         code: number;

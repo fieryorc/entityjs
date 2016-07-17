@@ -1,4 +1,4 @@
-import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityClass, EntityProperty } from "./entity";
+import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty } from "./entity";
 import * as Promise from "bluebird";
 
 export enum EntityState {
@@ -22,27 +22,64 @@ export enum EntityState {
  * Interface that provides storage specific APIs.
  */
 export interface IDataStore {
+    /**
+     * Called after the context is set. Provides a means to validate the entity
+     * for any data store specific validation.
+     */
     validate(entity: StorageEntity): void;
 
+    /**
+     * Delete the entity from store.
+     */
     del(entity: StorageEntity): Promise<boolean>;
 
+    /**
+     * Load the entity from store.
+     */
     get(entity: StorageEntity): Promise<boolean>;
 
+    /**
+     * Insert entity into the store.
+     */
     insert(entity: StorageEntity): Promise<void>;
 
+    /**
+     * Save the entity into the store.
+     */
     save(entity: StorageEntity): Promise<void>;
 
+    /**
+     * Query for entities.
+     * This is still Work in Progress.
+     */
     query<T>(type: { new (): T }, query: string): Promise<any[]>;
 }
 
+/**
+ * Interface that provides the context for entities.
+ * Every entity needs a datacontext to interact with the store.
+ */
 export interface IDataContext {
+    /**
+     * Store object. This provies the store specific APIs.
+     */
     store: IDataStore;
 
+    /**
+     * Load entity.
+     */
     load<T extends StorageEntity>(type: { new (): T }): Promise<T>;
 
+    /**
+     * Query for entities.
+     */
     query<T extends StorageEntity>(type: { new (): T }): Promise<T[]>;
 }
 
+/**
+ * Class that represents entity that can be stored in a remote storage.
+ * make sure to set the context of the store with setContext().
+ */
 export abstract class StorageEntity extends Entity {
     private _primaryKeys: PropertyDescriptor[] = [];
     public state: EntityState = EntityState.NOT_LOADED;
@@ -52,6 +89,9 @@ export abstract class StorageEntity extends Entity {
     private _error: any;
     private _context: IDataContext;
 
+    /**
+     * Initializes new instance of the storage entity.
+     */
     constructor() {
         super();
 
@@ -66,26 +106,36 @@ export abstract class StorageEntity extends Entity {
         }
     }
 
+    /**
+     * Returns list of primary keys.
+     */
     public getPrimaryKeys(): PropertyDescriptor[] {
         return this._primaryKeys.slice(0);
     }
 
+    /**
+     * Gets the context. Context provides the store to store entity.
+     */
     public getContext(): IDataContext {
         return this._context;
     }
 
+    /**
+     * Sets the context that provides store.
+     */
     public setContext(v: IDataContext) {
         this._context = v;
         this._context.store.validate(this);
     }
 
-    protected getStore(): IDataStore {
+    private getStore(): IDataStore {
         return this._context && this._context.store;
     }
 
     /**
      * Loads the entity if not loaded yet. Otherwise no-op.
      * Callers should always call load before accessing the entity.
+     * Promise returns true if loaded successfully.
      */
     public load(): Promise<boolean> {
 
@@ -124,13 +174,18 @@ export abstract class StorageEntity extends Entity {
      * Refresh the entity from server.
      * All local changes will be overwritten.
      */
-    public refresh(): Promise<boolean> {
+    public refresh(): Promise<void> {
         // If already loaded, force refresh.
         if (this.state === EntityState.LOADED) {
             this.loadingPromise = null;
         }
 
-        return this.load();
+        return this.load()
+        .then(isLoaded => {
+            if (!isLoaded) {
+                throw `Entity doesn't exist.`;
+            }
+        });
     }
 
     /**

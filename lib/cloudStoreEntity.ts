@@ -1,7 +1,10 @@
-import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityClass, EntityProperty, PrimaryKeyProperty } from "./entity";
-import { IDataContext, IDataStore, StorageEntity } from "./storageEntity";
-import * as Promise from "bluebird";
+import {  ValueProperty } from "./entity";
+import { StorageEntity } from "./storageEntity";
 
+/**
+ * Represents google cloud store entity.
+ * Has 'kind' property and few helpers.
+ */
 export abstract class CloudStoreEntity extends StorageEntity {
 
     @ValueProperty()
@@ -10,10 +13,6 @@ export abstract class CloudStoreEntity extends StorageEntity {
     constructor(kind: string) {
         super();
         this.kind = kind;
-    }
-
-    private get store(): IDataStore {
-        return this.getContext().store;
     }
 
     public getKey<T>(): T {

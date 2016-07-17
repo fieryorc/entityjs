@@ -2,6 +2,9 @@ import { StorageEntity } from "./storageEntity";
 import * as Promise from "bluebird";
 import { IDataStore, IDataContext } from "./storageEntity";
 
+/**
+ * Provides context for entities. Context provides the remote store.
+ */
 export class DataContext implements IDataContext {
     private _store: IDataStore;
 
@@ -9,17 +12,26 @@ export class DataContext implements IDataContext {
         this._store = store;
     }
 
+    /**
+     * Gets the store object.
+     */
     public get store(): IDataStore {
         return this._store;
     }
 
-    public load<T extends StorageEntity>(type: { new(): T }): Promise<T> {
+    /**
+     * Loads a given entity.
+     */
+    public load<T extends StorageEntity>(type: { new (): T }): Promise<T> {
         var entity = new type();
         entity.setContext(this);
         return entity.load().then(() => entity);
     }
 
-    public query<T extends StorageEntity>(type: { new(): T }): Promise<T[]> {
+    /**
+     * Query for entities using the query string.
+     */
+    public query<T extends StorageEntity>(type: { new (): T }): Promise<T[]> {
         return new Promise<T[]>((resolve, reject) => {
             resolve([]);
         });
@@ -28,11 +40,10 @@ export class DataContext implements IDataContext {
     /**
      * Creates new entity.
      */
-    public create<T extends StorageEntity>(type: { new(): T }): T {
+    public create<T extends StorageEntity>(type: { new (): T }): T {
         var entity = new type();
         entity.setContext(this);
 
         return entity;
     }
-    
 }

@@ -1,11 +1,14 @@
 import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
 import { IDataContext, IDataStore, StorageEntity } from "./storageEntity";
-import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityClass, EntityProperty, PrimaryKeyProperty } from "./entity";
+import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty, PrimaryKeyProperty } from "./entity";
 import { CloudStoreEntity } from "./cloudStoreEntity";
 import { CloudEntityHelpers } from "./cloudEntityHelpers";
 import * as lodash from "lodash";
 
+/**
+ * Implements Google Cloud Datastore.
+ */
 export class CloudDataStore implements IDataStore {
     private store: GCloud.Datastore.IDatastore;
 
