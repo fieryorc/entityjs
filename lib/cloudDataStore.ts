@@ -25,7 +25,7 @@ export class CloudDataStore implements IDataStore {
         }
     }
 
-    public del(entity: StorageEntity): Promise<void> {
+    public del(entity: StorageEntity): Promise<boolean> {
         var cEntity = <CloudStoreEntity>entity;
         var delPromise = Promise.promisify(this.store.delete, { context: this.store });
         var key = this.store.key([cEntity.kind, cEntity.getKey()]);
@@ -35,12 +35,16 @@ export class CloudDataStore implements IDataStore {
             });
     }
 
-    public get(entity: StorageEntity): Promise<any> {
+    public get(entity: StorageEntity): Promise<boolean> {
         var cEntity = <CloudStoreEntity>entity;
         var getPromise = Promise.promisify(this.store.get, { context: this.store });
         var key = this.store.key([cEntity.kind, cEntity.getKey()]);
         return getPromise(key)
             .then((v: any) => {
+                if (!v) {
+                    return false;
+                }
+                
                 var obj = v.data;
                 for (var key in obj) {
                     if (!obj.hasOwnProperty(key)) {
@@ -61,17 +65,18 @@ export class CloudDataStore implements IDataStore {
                 }
 
                 cEntity.resetState();
+                return true;
             })
             .catch(err => {
                 throw this.convertError(err);
             });;
     }
 
-    public insert(entity: StorageEntity): Promise<any> {
+    public insert(entity: StorageEntity): Promise<void> {
         return this.doInsert(entity, false);
     }
 
-    public save(entity: StorageEntity): Promise<any> {
+    public save(entity: StorageEntity): Promise<void> {
         return this.doInsert(entity, true);
     }
 

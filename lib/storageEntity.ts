@@ -24,13 +24,13 @@ export enum EntityState {
 export interface IDataStore {
     validate(entity: StorageEntity): void;
 
-    del(entity: StorageEntity): Promise<void>;
+    del(entity: StorageEntity): Promise<boolean>;
 
-    get(entity: StorageEntity): Promise<any>;
+    get(entity: StorageEntity): Promise<boolean>;
 
-    insert(entity: StorageEntity): Promise<any>;
+    insert(entity: StorageEntity): Promise<void>;
 
-    save(entity: StorageEntity): Promise<any>;
+    save(entity: StorageEntity): Promise<void>;
 
     query<T>(type: { new (): T }, query: string): Promise<any[]>;
 }
@@ -46,7 +46,7 @@ export interface IDataContext {
 export abstract class StorageEntity extends Entity {
     private _primaryKeys: PropertyDescriptor[] = [];
     public state: EntityState = EntityState.NOT_LOADED;
-    private loadingPromise: Promise<void>;
+    private loadingPromise: Promise<boolean>;
     private deletingPromise: Promise<void>;
     private savePromise: Promise<void>;
     private _error: any;
@@ -87,7 +87,7 @@ export abstract class StorageEntity extends Entity {
      * Loads the entity if not loaded yet. Otherwise no-op.
      * Callers should always call load before accessing the entity.
      */
-    public load(): Promise<void> {
+    public load(): Promise<boolean> {
 
         if (this.state === EntityState.NOT_LOADED ||
             this.state === EntityState.LOADED ||
@@ -107,7 +107,8 @@ export abstract class StorageEntity extends Entity {
 
         this.loadingPromise = promise
             .then(v => {
-                this.state = EntityState.LOADED;
+                this.state = v ? EntityState.LOADED : EntityState.NOT_LOADED;
+                return v;
             })
             .catch(err => {
                 this.state = EntityState.NOT_LOADED;
@@ -123,7 +124,7 @@ export abstract class StorageEntity extends Entity {
      * Refresh the entity from server.
      * All local changes will be overwritten.
      */
-    public refresh(): Promise<void> {
+    public refresh(): Promise<boolean> {
         // If already loaded, force refresh.
         if (this.state === EntityState.LOADED) {
             this.loadingPromise = null;

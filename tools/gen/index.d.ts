@@ -177,15 +177,5 @@ export class DataContext implements IDataContext {
     }): T;
 }
 
-export interface IDictionary<T> {
-    [key: string]: T;
-}
-
-export interface PromiseError {
-    message: string;
-    code: number;
-    stack: string;
-}
-
 // Dummy import to pretend this file to be a module to tsc.
 import * as m from "entityjs";

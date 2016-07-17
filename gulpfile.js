@@ -20,21 +20,18 @@ gulp.task("build", function () {
         .pipe(sourcemaps.init())
         .pipe(tsc(tsProject));
     var tsOutput = tsResult.js
-        .pipe(sourcemaps.write("."))
-        .pipe(gulp.dest(bindir))
+//        .pipe(sourcemaps.write("."))
         .pipe(gulp.dest(distdir));
 
     var dtsOutput = tsResult.dts
-        .pipe(gulp.dest(bindir))
-        .pipe(concat("index.d.ts"))
-        .pipe(gulp.dest(distdir));
+        .pipe(concat("index.tmp.d.ts"))
+        .pipe(gulp.dest(bindir));
 
     var copyFiles = gulp.src(["package.json"])
-        .pipe(gulp.dest(bindir))
         .pipe(gulp.dest(distdir));
 
     return merge(tsOutput, dtsOutput, copyFiles)
-        .pipe(debug({ title: "Output Files:" }));
+//        .pipe(debug({ title: "Output Files:" }))
     ;
 });
 
