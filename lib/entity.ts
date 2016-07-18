@@ -175,7 +175,7 @@ export abstract class Entity {
      * Returns true if the entity has changed.
      * i.e., any property has changed.
      */
-    public get changed(): boolean {
+    public getChanged(): boolean {
         return this._changed;
     }
 

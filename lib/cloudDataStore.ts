@@ -8,6 +8,7 @@ import * as lodash from "lodash";
 
 /**
  * Implements Google Cloud Datastore.
+ * Any entity of type CloudStoreEntity can use this store.
  */
 export class CloudDataStore implements IDataStore {
     private store: GCloud.Datastore.IDatastore;
@@ -19,8 +20,8 @@ export class CloudDataStore implements IDataStore {
     public validate(entity: StorageEntity): void {
         var cEntity = <CloudStoreEntity>entity;
         var len = entity.getPrimaryKeys().length;
-        if (len != 1) {
-            throw `Entity should have only one primary key. But contains ${len}.`;
+        if (len != 2) {
+            throw `Entity should have only one primary key(other than 'kind'). But contains ${len - 1}.`;
         }
 
         if (!cEntity.kind) {
@@ -47,40 +48,22 @@ export class CloudDataStore implements IDataStore {
                 if (!v) {
                     return false;
                 }
-                
+
                 var obj = v.data;
-                for (var key in obj) {
-                    if (!obj.hasOwnProperty(key)) {
-                        throw `load():Entity(${cEntity.kind}) doesn't have property ${key}.`;
-                    }
-
-                    var descriptor = entity.getPropertyDescriptor(key);
-                    if (descriptor) {
-                        if (descriptor.type === PropertyType.PRIMARY ||
-                            descriptor.type === PropertyType.VALUE) {
-
-                            cEntity.setPropertyValue(descriptor.name, obj[key]);
-                        } else if (descriptor.type === PropertyType.REFERENCE) {
-                            var refEntity: CloudStoreEntity = new descriptor.referenceType();
-                            refEntity.setKey(obj[key]);
-                        }
-                    }
-                }
-
-                cEntity.resetState();
-                return true;
+                return CloudEntityHelpers.loadObject(cEntity, v.data)
+                    .then(() => true);
             })
             .catch(err => {
                 throw this.convertError(err);
             });;
     }
 
-    public insert(entity: StorageEntity): Promise<void> {
+    public insert(entity: StorageEntity): Promise<boolean> {
         return this.doInsert(entity, false);
     }
 
     public save(entity: StorageEntity): Promise<void> {
-        return this.doInsert(entity, true);
+        return this.doInsert(entity, true).then(v => null);
     }
 
     public query<T>(type: { new (): T }, query: string): Promise<any[]> {
@@ -89,14 +72,15 @@ export class CloudDataStore implements IDataStore {
         });
     }
 
-    private doInsert(entity: StorageEntity, overwrite: boolean): Promise<any> {
+    private doInsert(entity: StorageEntity, overwrite: boolean): Promise<boolean> {
         var cEntity = <CloudStoreEntity>entity;
         var id = cEntity.getKey();
         var key = this.store.key(id ? [cEntity.kind, id] : cEntity.kind);
         var keyStr = JSON.stringify(key);
         var insertPromise = Promise.promisify(overwrite ? this.store.upsert : this.store.insert,
             { context: this.store });
-        return insertPromise({ key: key, data: CloudEntityHelpers.getStorageObject(cEntity) })
+        // TODO: Check return values.
+        return <any> insertPromise({ key: key, data: CloudEntityHelpers.getStorageObject(cEntity) })
             .catch(err => { throw this.convertError(err); });;
     }
 

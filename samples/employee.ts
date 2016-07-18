@@ -8,7 +8,7 @@ import * as Promise from "bluebird";
 
 class EmployeeEntity extends CloudStoreEntity {
 
-    public static KIND = "user";
+    public static KIND = "employee";
 
     /**
      * This means the property is a primary key.

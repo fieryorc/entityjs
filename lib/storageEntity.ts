@@ -41,7 +41,7 @@ export interface IDataStore {
     /**
      * Insert entity into the store.
      */
-    insert(entity: StorageEntity): Promise<void>;
+    insert(entity: StorageEntity): Promise<boolean>;
 
     /**
      * Save the entity into the store.
@@ -82,17 +82,18 @@ export interface IDataContext {
  */
 export abstract class StorageEntity extends Entity {
     private _primaryKeys: PropertyDescriptor[] = [];
-    public state: EntityState = EntityState.NOT_LOADED;
-    private loadingPromise: Promise<boolean>;
-    private deletingPromise: Promise<void>;
-    private savePromise: Promise<void>;
+    private _entityState: EntityState = EntityState.NOT_LOADED;
+    private _loadingPromise: Promise<boolean>;
+    private _deletingPromise: Promise<void>;
+    private _savePromise: Promise<void>;
+    private _insertPromise: Promise<boolean>;
     private _error: any;
     private _context: IDataContext;
 
     /**
      * Initializes new instance of the storage entity.
      */
-    constructor() {
+    public constructor() {
         super();
 
         this.getPropertyDescriptors().forEach(d => {
@@ -104,6 +105,20 @@ export abstract class StorageEntity extends Entity {
         if (this._context) {
             this._context.store.validate(this);
         }
+    }
+
+    /**
+     * Get the current state of the entitye.
+     */
+    public getState(): EntityState {
+        return this._entityState;
+    }
+
+    /**
+     * Sets the entity state.
+     */
+    private setState(state: EntityState) {
+        this._entityState = state;
     }
 
     /**
@@ -139,35 +154,35 @@ export abstract class StorageEntity extends Entity {
      */
     public load(): Promise<boolean> {
 
-        if (this.state === EntityState.NOT_LOADED ||
-            this.state === EntityState.LOADED ||
-            this.state === EntityState.LOADING) {
+        if (this.getState() === EntityState.NOT_LOADED ||
+            this.getState() === EntityState.LOADED ||
+            this.getState() === EntityState.LOADING) {
 
-            if (this.loadingPromise) {
-                return this.loadingPromise;
+            if (this._loadingPromise) {
+                return this._loadingPromise;
             }
         } else {
             // Invalid states.
-            throw `Can't load(). Entity is in invalid state: ${EntityState[this.state]}.`;
+            throw `Can't load(). Entity is in invalid state: ${EntityState[this.getState()]}.`;
         }
 
-        this.loadingPromise = null;
-        this.state = EntityState.LOADING;
+        this._loadingPromise = null;
+        this.setState(EntityState.LOADING);
         var promise = this.getStore().get(this);
 
-        this.loadingPromise = promise
+        this._loadingPromise = promise
             .then(v => {
-                this.state = v ? EntityState.LOADED : EntityState.NOT_LOADED;
+                this.setState(v ? EntityState.LOADED : EntityState.NOT_LOADED);
                 return v;
             })
             .catch(err => {
-                this.state = EntityState.NOT_LOADED;
-                this.loadingPromise = null;
+                this.setState(EntityState.NOT_LOADED);
+                this._loadingPromise = null;
                 this._error = err;
                 throw err;
             });;
 
-        return this.loadingPromise;
+        return this._loadingPromise;
     }
 
     /**
@@ -176,78 +191,121 @@ export abstract class StorageEntity extends Entity {
      */
     public refresh(): Promise<void> {
         // If already loaded, force refresh.
-        if (this.state === EntityState.LOADED) {
-            this.loadingPromise = null;
+        if (this.getState() === EntityState.LOADED) {
+            this._loadingPromise = null;
         }
 
         return this.load()
-        .then(isLoaded => {
-            if (!isLoaded) {
-                throw `Entity doesn't exist.`;
-            }
-        });
+            .then(isLoaded => {
+                if (!isLoaded) {
+                    throw `Entity doesn't exist.`;
+                }
+            });
     }
 
     /**
      * Deletes the entity from server.
      */
     public delete(): Promise<void> {
-        if (this.state === EntityState.DELETING) {
-            if (this.deletingPromise) {
-                return this.deletingPromise;
+        if (this.getState() === EntityState.DELETING) {
+            if (this._deletingPromise) {
+                return this._deletingPromise;
             }
-        } else if (this.state == EntityState.DELETED) {
-            return Promise.resolve();
-        }
-        else if (this.state === EntityState.LOADING) {
-            throw `Can't delete entity. Invalid state ${EntityState[this.state]}`;
+        } else if (!(this.getState() == EntityState.NOT_LOADED ||
+            this.getState() == EntityState.LOADED)) {
+
+            throw `Can't delete entity. Invalid state ${EntityState[this.getState()]}`;
         }
 
-        var currentState = this.state;
-        this.state = EntityState.DELETING;
-        this.deletingPromise = this.getStore().del(this)
+        var currentState = this.getState();
+        this.setState(EntityState.DELETING);
+        this._deletingPromise = this.getStore().del(this)
             .then(() => {
-                this.state = EntityState.DELETED;
+                this.setState(EntityState.DELETED);
             })
             .catch(err => {
-                this.state = currentState;
-                this.deletingPromise = null;
+                this.setState(currentState);
+                this._deletingPromise = null;
                 this._error = err;
                 throw err;
             });
 
-        return this.deletingPromise;
+        return this._deletingPromise;
     }
 
     /**
-     * Saves the entity to remote store. 
+     * Saves the entity to remote store.
+     * @param insert If true, save will fail if already exists. 
      */
     public save(): Promise<void> {
-        if (this.state === EntityState.LOADED ||
-            this.state === EntityState.NOT_LOADED) {
-
-            if (this.savePromise) {
-                return this.savePromise;
-            }
-        } else {
-            throw `Can't save entity: Invalid state: ${EntityState[this.state]}.`;
+        if (this._insertPromise) {
+            Promise.reject("Can't save entity. insert() already in progress.");
+            return;
         }
 
-        if (!this.changed) {
-            return Promise.resolve();
+        if (this._savePromise) {
+            return this._savePromise;
         }
-
-        this.savePromise = this.getStore().save(this)
+        var promise = this._save(/* overwrite */ true)
             .then(() => {
-                this.state = EntityState.LOADED;
+                this._savePromise = null;
+            })
+            .catch((err) => {
+                this._savePromise = null;
+                throw err;
+            });
+
+        this._savePromise = promise;
+        return promise;
+    }
+
+    /**
+     * Insert this entity into the data store.
+     * If already exists, will fail.
+     */
+    public insert(): Promise<boolean> {
+        if (this._insertPromise) {
+            return this._insertPromise;
+        }
+
+        if (this._savePromise) {
+            Promise.reject("Can't insert entity. Save in progress.");
+            return;
+        }
+
+        var promise = this._save(/* overwrite */ false)
+            .then((v) => {
+                this._insertPromise = null;
+                return v;
+            })
+            .catch((err) => {
+                this._insertPromise = null;
+                throw err;
+            });
+
+        this._insertPromise = promise;
+        return promise;
+    }
+
+    private _save(overwrite: boolean): Promise<boolean> {
+        if (this.getState() === EntityState.LOADED ||
+            this.getState() === EntityState.NOT_LOADED) {
+            // We are good.
+        } else {
+            throw `Can't save entity: Invalid state: ${EntityState[this.getState()]}.`;
+        }
+
+        var promise = overwrite ? <Promise<boolean>><any>this.getStore().save(this) : this.getStore().insert(this);
+        return promise
+            .then((succeeded) => {
+                this.setState(EntityState.LOADED);
                 this.resetState();
+                return succeeded;
             })
             .catch(err => {
                 this._error = err;
                 throw err;
             });
-
-        return this.savePromise;
     }
 }
 

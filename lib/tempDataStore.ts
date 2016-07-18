@@ -17,8 +17,8 @@ export class TempDataStore implements IDataStore {
 
     public validate(entity: StorageEntity): void {
         var len = entity.getPrimaryKeys().length;
-        if (len != 1) {
-            throw `Entity should have only one primary key. But contains ${len}.`;
+        if (len < 1) {
+            throw `Entity should have atleast one primary key.`;
         }
     }
 
@@ -30,15 +30,21 @@ export class TempDataStore implements IDataStore {
 
     public get(entity: StorageEntity): Promise<boolean> {
         var key = this.getKey(entity);
-        return Promise.resolve(!!this.store[key]);
+        if (!(key in this.store)) {
+            return Promise.resolve(false);
+        }
+        return CloudEntityHelpers.loadObject(entity, this.store[key])
+            .then(() => true);
     }
 
-    public insert(entity: StorageEntity): Promise<void> {
-        return this.doInsert(entity, false);
+    public insert(entity: StorageEntity): Promise<boolean> {
+        return this.doInsert(entity, false)
+            .then(() => true)
+            .catch(err => false);
     }
 
     public save(entity: StorageEntity): Promise<void> {
-        return this.doInsert(entity, true);
+        return <any>this.doInsert(entity, true);
     }
 
     public query<T>(type: { new (): T }, query: string): Promise<any[]> {
@@ -47,19 +53,26 @@ export class TempDataStore implements IDataStore {
         });
     }
 
-    private doInsert(entity: StorageEntity, overwrite: boolean): Promise<any> {
-        var key = this.getKey(entity);
+    private doInsert(entity: StorageEntity, overwrite: boolean): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            var key = this.getKey(entity);
 
-        if (!overwrite && key in this.store) {
-            throw `Entity key(${key})already exists.`;
-        }
+            if (!overwrite && (key in this.store)) {
+                reject(`Entity key(${key})already exists.`);
+                return;
+            }
 
-        this.store[key] = CloudEntityHelpers.getPublicObject(<CloudStoreEntity>entity);
-        return Promise.resolve();
+            this.store[key] = CloudEntityHelpers.getPublicObject(<CloudStoreEntity>entity);
+            resolve();
+        });
     }
 
     private getKey(entity: StorageEntity): string {
-        var keyName = entity.getPrimaryKeys()[0].name;
-        return entity.getPropertyValue<string>(keyName);
+        var key = "";
+        var primaryKeyDescriptors = entity.getPrimaryKeys();
+        for (var i = primaryKeyDescriptors.length - 1; i >= 0; i--) {
+            key += (!key ? "" : ".") + entity.getPropertyValue<string>(primaryKeyDescriptors[i].name);
+        }
+        return key;
     }
 }

@@ -1,15 +1,20 @@
-import {  ValueProperty } from "./entity";
+import {  PrimaryKeyProperty } from "./entity";
 import { StorageEntity } from "./storageEntity";
 
 /**
- * Represents google cloud store entity.
+ * Represents google cloud data store entity.
+ * For more info: https://cloud.google.com/datastore/
  * Has 'kind' property and few helpers.
  */
 export abstract class CloudStoreEntity extends StorageEntity {
 
-    @ValueProperty()
+    @PrimaryKeyProperty()
     public kind: string;
 
+    /**
+     * Instantiates new CloudStoreEntity.
+     * @param kind Entity kind. Used by google cloud store.
+     */
     constructor(kind: string) {
         super();
         this.kind = kind;

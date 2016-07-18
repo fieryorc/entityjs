@@ -13,7 +13,7 @@
     "tasks": [
         {
             "taskName": "build",
-            "args": [ ],
+            "args": [ "watch" ],
             "isBuildCommand": true,
             "showOutput": "silent",
             "isWatching": true,
