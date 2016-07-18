@@ -1,9 +1,8 @@
 import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
 import { IDataContext, IDataStore, StorageEntity } from "./storageEntity";
-import { CloudStoreEntity } from "./cloudStoreEntity";
 import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty, PrimaryKeyProperty } from "./entity";
-import { CloudEntityHelpers } from "./cloudEntityHelpers";
+import { EntityHelpers } from "./entityHelpers";
 
 /**
  * Implements Temporary store based on object storage.
@@ -33,7 +32,7 @@ export class TempDataStore implements IDataStore {
         if (!(key in this.store)) {
             return Promise.resolve(false);
         }
-        return CloudEntityHelpers.loadObject(entity, this.store[key])
+        return EntityHelpers.loadObject(entity, this.store[key])
             .then(() => true);
     }
 
@@ -62,7 +61,8 @@ export class TempDataStore implements IDataStore {
                 return;
             }
 
-            this.store[key] = CloudEntityHelpers.getPublicObject(<CloudStoreEntity>entity);
+            this.store[key] = EntityHelpers.getObject(
+                <StorageEntity>entity, /* validate */ true, /* includeRef */ true, ["kind"]);
             resolve();
         });
     }

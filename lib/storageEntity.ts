@@ -222,6 +222,7 @@ export abstract class StorageEntity extends Entity {
         this._deletingPromise = this.getStore().del(this)
             .then(() => {
                 this.setState(EntityState.DELETED);
+                this.resetState();
             })
             .catch(err => {
                 this.setState(currentState);

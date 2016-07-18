@@ -3,7 +3,7 @@ import * as Promise from "bluebird";
 import { IDataContext, IDataStore, StorageEntity } from "./storageEntity";
 import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty, PrimaryKeyProperty } from "./entity";
 import { CloudStoreEntity } from "./cloudStoreEntity";
-import { CloudEntityHelpers } from "./cloudEntityHelpers";
+import { EntityHelpers } from "./entityHelpers";
 import * as lodash from "lodash";
 
 /**
@@ -32,7 +32,7 @@ export class CloudDataStore implements IDataStore {
     public del(entity: StorageEntity): Promise<boolean> {
         var cEntity = <CloudStoreEntity>entity;
         var delPromise = Promise.promisify(this.store.delete, { context: this.store });
-        var key = this.store.key([cEntity.kind, cEntity.getKey()]);
+        var key = this.store.key([cEntity.kind, this.getKey<string>(cEntity)]);
         return delPromise(key)
             .catch(err => {
                 throw this.convertError(err);
@@ -42,7 +42,7 @@ export class CloudDataStore implements IDataStore {
     public get(entity: StorageEntity): Promise<boolean> {
         var cEntity = <CloudStoreEntity>entity;
         var getPromise = Promise.promisify(this.store.get, { context: this.store });
-        var key = this.store.key([cEntity.kind, cEntity.getKey()]);
+        var key = this.store.key([cEntity.kind, this.getKey<string>(cEntity)]);
         return getPromise(key)
             .then((v: any) => {
                 if (!v) {
@@ -50,7 +50,7 @@ export class CloudDataStore implements IDataStore {
                 }
 
                 var obj = v.data;
-                return CloudEntityHelpers.loadObject(cEntity, v.data)
+                return EntityHelpers.loadObject(cEntity, v.data)
                     .then(() => true);
             })
             .catch(err => {
@@ -74,13 +74,14 @@ export class CloudDataStore implements IDataStore {
 
     private doInsert(entity: StorageEntity, overwrite: boolean): Promise<boolean> {
         var cEntity = <CloudStoreEntity>entity;
-        var id = cEntity.getKey();
+        var id = this.getKey<string>(cEntity);
         var key = this.store.key(id ? [cEntity.kind, id] : cEntity.kind);
         var keyStr = JSON.stringify(key);
         var insertPromise = Promise.promisify(overwrite ? this.store.upsert : this.store.insert,
             { context: this.store });
         // TODO: Check return values.
-        return <any> insertPromise({ key: key, data: CloudEntityHelpers.getStorageObject(cEntity) })
+        var storageObj = EntityHelpers.getObject(cEntity, /* validate */ true, /* includeRef */ true, ["kind"])
+        return <any>insertPromise({ key: key, data: storageObj })
             .catch(err => { throw this.convertError(err); });;
     }
 
@@ -96,4 +97,10 @@ export class CloudDataStore implements IDataStore {
             stack: err.stack
         };
     }
+
+    private getKey<T>(entity: StorageEntity): T {
+        var propName = entity.getPrimaryKeys()[0].name;
+        return <T>entity.getPropertyValue(propName);
+    }
+
 }

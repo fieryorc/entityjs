@@ -91,7 +91,7 @@ export function ValueProperty(required?: boolean) {
 /**
  * Decorator representing primary key property.
  */
-export function PrimaryKeyProperty() {
+export function PrimaryKeyProperty(foreign_key?: string) {
     return EntityProperty(PropertyType.PRIMARY, true, null, null);
 }
 

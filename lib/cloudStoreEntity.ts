@@ -1,4 +1,4 @@
-import {  PrimaryKeyProperty } from "./entity";
+import {  PrimaryKeyProperty, PropertyType, PropertyDescriptor } from "./entity";
 import { StorageEntity } from "./storageEntity";
 
 /**
@@ -18,15 +18,32 @@ export abstract class CloudStoreEntity extends StorageEntity {
     constructor(kind: string) {
         super();
         this.kind = kind;
+        var descriptors = CloudStoreEntity.getDescriptors(this);
+        for (var key in descriptors) {
+            var d = descriptors[key];
+            if (d.type === PropertyType.REFERENCE && !d.foreign_key) {
+                d.foreign_key = CloudStoreEntity.getPrimaryKeyName(d.referenceType);
+            }
+        }
     }
 
-    public getKey<T>(): T {
-        var propName = this.getPrimaryKeys()[0].name;
-        return <T>this.getPropertyValue(propName);
+    private static getPrimaryKeyName(type: { new (): any }): string {
+        var descriptors = CloudStoreEntity.getDescriptors(type.prototype);
+
+        var primaryKeys: string[] = [];
+        for (var key in descriptors) {
+            var d = descriptors[key];
+            if (d.type == PropertyType.PRIMARY && d.name != "kind") {
+                primaryKeys.push(d.name);
+            }
+        }
+        if (primaryKeys.length > 1) {
+            throw `Only one primary key allowed. Entity(${type}) has ${primaryKeys.length}.`;
+        }
+        return primaryKeys[0];
     }
 
-    public setKey<T>(value: T) {
-        var propName = this.getPrimaryKeys()[0].name;
-        this.setPropertyValue(propName, value);
+    private static getDescriptors(entity: any): CommonTypes.IDictionary<PropertyDescriptor> {
+        return entity._propertyMetadata;
     }
 }

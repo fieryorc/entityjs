@@ -1,7 +1,7 @@
 {
   "name": "entityjs",
   "description": "Entity Framework for Node.js",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "license": "MIT",
   "author": "Prem Ramanathan",
   "repository": {

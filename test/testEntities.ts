@@ -59,7 +59,7 @@ export class BugEntity extends CloudStoreEntity {
     @ReferenceProperty(UserEntity)
     public assignedTo: UserEntity;
 
-    @ReferenceProperty(UserEntity)
+    @ValueProperty()
     public state: BugStates;
 
     public constructor() {
