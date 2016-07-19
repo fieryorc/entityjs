@@ -9,6 +9,10 @@ export class DataContext implements IDataContext {
     private _store: IDataStore;
 
     public constructor(store: IDataStore) {
+        if (!store) {
+            throw "DataContext(): store is empty."
+        }
+        
         this._store = store;
     }
 

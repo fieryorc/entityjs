@@ -138,8 +138,12 @@ export abstract class StorageEntity extends Entity {
     /**
      * Sets the context that provides store.
      */
-    public setContext(v: IDataContext) {
-        this._context = v;
+    public setContext(context: IDataContext) {
+        if (!context) {
+            throw "setContext(): empty context."
+        }
+
+        this._context = context;
         this._context.store.validate(this);
     }
 
