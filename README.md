@@ -12,6 +12,7 @@ Some of the notable features:
 
 Usage
 -----
+For complete sample app: https://github.com/fieryorc/entityjs-sample
 
 ## Declaring entity:
 
@@ -100,7 +101,7 @@ employee.load()
     if (isLoaded) {
       // By default reference entities are created, but not loaded.
       // You need to call load() on them to load it.
-      assert(EntityState.LOADED, employee.manager.getState());
+      assert(EntityState.NOT_LOADED, employee.manager.getState());
       assert.not.null(employee.manager.id);
       return employee.manager.load();
     }
