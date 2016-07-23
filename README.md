@@ -13,7 +13,6 @@ Some of the notable features:
 TODO: 
 * Support for saving multiple entities
 * Querying multiple entities.
-* Move the metadata into closure.
 
 Usage
 -----
