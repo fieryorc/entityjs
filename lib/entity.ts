@@ -57,7 +57,7 @@ export class PropertyValue {
      * Property descriptor.
      */
     public descriptor: PropertyDescriptor;
-    
+
     /**
      * Old value of the property.
      */
@@ -147,18 +147,38 @@ export function EntityProperty<T extends Entity>(
             }
         }
 
-        // Setup the prototype chain so the property descriptors from
-        // base classes are wired up with the ones in subclasses.
-        var mapPropertyName = "_propertyMetadata";
-        var baseValue = target[mapPropertyName];
-        if (!target.hasOwnProperty(mapPropertyName)) {
-            function clone_proto() { };
-            clone_proto.prototype = baseValue;
-            target[mapPropertyName] = new (<any>clone_proto)();
+        // Setup the prototype chain.
+        // Create getPrivate method for each prototype and set it's prototype to it's parent.
+        var baseValue = target.getPrivate();
+        if (!target.hasOwnProperty("getPrivate")) {
+            var obj = baseValue ? chain(baseValue) : {};
+            target.getPrivate = function () {
+                return obj;
+            }
+            obj.propertyMetadata = {};
+            // Set prototype chain for the propertyMetadata object.
+            if (baseValue) {
+                if (!baseValue.propertyMetadata) {
+                    throw "Internal error. Property metadata for base object is not initialized. This should never happen.";
+                }
+                obj.propertyMetadata = chain(baseValue.propertyMetadata);
+            }
         }
 
-        target._propertyMetadata[propertyKey] = descriptor;
+        target.getPrivate().propertyMetadata[propertyKey] = descriptor;
     }
+}
+
+function chain(source: any) {
+    function clone() { };
+    clone.prototype = source;
+    return new (<any>clone)();
+}
+
+export interface IEntityPrivate {
+    propertyMetadata: CommonTypes.IDictionary<PropertyDescriptor>;
+    propertyValues: CommonTypes.IDictionary<PropertyValue>;
+    changed: boolean;
 }
 
 /**
@@ -167,16 +187,28 @@ export function EntityProperty<T extends Entity>(
  */
 @EntityClass
 export abstract class Entity {
-    private _propertyMetadata: CommonTypes.IDictionary<PropertyDescriptor>;
-    private _propertyValues: CommonTypes.IDictionary<PropertyValue> = {};
-    private _changed: boolean;
+
+    public constructor() {
+        var obj = chain(Object.getPrototypeOf(this).getPrivate());
+        (<any>this).getPrivate = function () {
+            return obj;
+        };
+        this.getPrivate().propertyValues = {};
+    }
+
+    /**
+     * Returns the private object that contains all the metadata.
+     */
+    public getPrivate(): IEntityPrivate {
+        return null;
+    }
 
     /**
      * Returns true if the entity has changed.
      * i.e., any property has changed.
      */
     public getChanged(): boolean {
-        return this._changed;
+        return this.getPrivate().changed;
     }
 
     /**
@@ -184,7 +216,7 @@ export abstract class Entity {
      * @param name Name of the property.
      */
     public getPropertyValue<T>(name: string): T {
-        var prop = this._propertyValues[name];
+        var prop = this.getPrivate().propertyValues[name];
         return prop && prop.value;
     }
 
@@ -195,7 +227,7 @@ export abstract class Entity {
      * This method should not be consumed directly. Just set the properties directly.
      */
     public setPropertyValue<T>(name: string, value: T): void {
-        var valueMap = this._propertyValues;
+        var valueMap = this.getPrivate().propertyValues;
         var prop = valueMap[name];
         if (!prop) {
             prop = valueMap[name] = <PropertyValue>{
@@ -203,7 +235,7 @@ export abstract class Entity {
             };
         }
 
-        this._changed = true;
+        this.getPrivate().changed = true;
         prop.origValue = prop.value;
         prop.value = value;
         prop.changed = true;
@@ -214,7 +246,7 @@ export abstract class Entity {
      * @param name Name of the property.
      */
     public getProperty(name: string): PropertyValue {
-        return this._propertyValues[name];
+        return this.getPrivate().propertyValues[name];
     }
 
     /**
@@ -222,7 +254,7 @@ export abstract class Entity {
      * @param name Name of the property.
      */
     public getPropertyDescriptor(name: string): PropertyDescriptor {
-        var descriptor = this._propertyMetadata[name];
+        var descriptor = this.getPrivate().propertyMetadata[name];
         return descriptor && this.clone(descriptor);
     }
 
@@ -231,7 +263,7 @@ export abstract class Entity {
      */
     public getPropertyDescriptors(): PropertyDescriptor[] {
         var descriptors: PropertyDescriptor[] = [];
-        var obj = this._propertyMetadata;
+        var obj = this.getPrivate().propertyMetadata;
         for (var key in obj) {
             descriptors.push(this.clone(obj[key]));
         }
@@ -245,7 +277,7 @@ export abstract class Entity {
      */
     public resetState(): void {
         this.getProperties().forEach((pv) => { pv.changed = false; });
-        this._changed = false;
+        this.getPrivate().changed = false;
     }
 
     /**
@@ -253,7 +285,7 @@ export abstract class Entity {
      */
     public getProperties(): PropertyValue[] {
         var props: PropertyValue[] = [];
-        var obj = this._propertyValues;
+        var obj = this.getPrivate().propertyValues;
         for (var propKey in obj) {
             if (obj.hasOwnProperty(propKey)) {
                 props.push(obj[propKey]);
@@ -268,7 +300,7 @@ export abstract class Entity {
      */
     public getChangedProperties(): PropertyValue[] {
         var props: PropertyValue[] = [];
-        var obj = this._propertyValues;
+        var obj = this.getPrivate().propertyValues;
         for (var propKey in obj) {
             var p: PropertyValue = obj[p.descriptor.name];
             if (p.changed) {

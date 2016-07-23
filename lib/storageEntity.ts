@@ -1,4 +1,9 @@
-import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty } from "./entity";
+import { Entity,
+    IEntityPrivate,
+    PropertyType,
+    ValueProperty,
+    PropertyDescriptor,
+    EntityProperty } from "./entity";
 import * as Promise from "bluebird";
 
 export enum EntityState {
@@ -76,63 +81,71 @@ export interface IDataContext {
     query<T extends StorageEntity>(type: { new (): T }): Promise<T[]>;
 }
 
+export interface IStorageEntityPrivate extends IEntityPrivate {
+    primaryKeys: PropertyDescriptor[];
+    entityState: EntityState;
+    loadingPromise: Promise<boolean>;
+    deletingPromise: Promise<void>;
+    savePromise: Promise<void>;
+    insertPromise: Promise<boolean>;
+    error: any;
+    context: IDataContext;
+}
+
 /**
  * Class that represents entity that can be stored in a remote storage.
  * make sure to set the context of the store with setContext().
  */
 export abstract class StorageEntity extends Entity {
-    private _primaryKeys: PropertyDescriptor[] = [];
-    private _entityState: EntityState = EntityState.NOT_LOADED;
-    private _loadingPromise: Promise<boolean>;
-    private _deletingPromise: Promise<void>;
-    private _savePromise: Promise<void>;
-    private _insertPromise: Promise<boolean>;
-    private _error: any;
-    private _context: IDataContext;
 
     /**
      * Initializes new instance of the storage entity.
      */
     public constructor() {
         super();
+        this.getPrivate().primaryKeys = [];
+        this.getPrivate().entityState = EntityState.NOT_LOADED;
 
         this.getPropertyDescriptors().forEach(d => {
             if (d.type == PropertyType.PRIMARY) {
-                this._primaryKeys.push(d);
+                this.getPrivate().primaryKeys.push(d);
             }
         });
 
-        if (this._context) {
-            this._context.store.validate(this);
+        if (this.getPrivate().context) {
+            this.getPrivate().context.store.validate(this);
         }
     }
 
+    public getPrivate(): IStorageEntityPrivate {
+        return null;
+    }
     /**
      * Get the current state of the entitye.
      */
     public getState(): EntityState {
-        return this._entityState;
+        return this.getPrivate().entityState;
     }
 
     /**
      * Sets the entity state.
      */
     private setState(state: EntityState) {
-        this._entityState = state;
+        this.getPrivate().entityState = state;
     }
 
     /**
      * Returns list of primary keys.
      */
     public getPrimaryKeys(): PropertyDescriptor[] {
-        return this._primaryKeys.slice(0);
+        return this.getPrivate().primaryKeys.slice(0);
     }
 
     /**
      * Gets the context. Context provides the store to store entity.
      */
     public getContext(): IDataContext {
-        return this._context;
+        return this.getPrivate().context;
     }
 
     /**
@@ -143,12 +156,12 @@ export abstract class StorageEntity extends Entity {
             throw "setContext(): empty context."
         }
 
-        this._context = context;
-        this._context.store.validate(this);
+        this.getPrivate().context = context;
+        this.getPrivate().context.store.validate(this);
     }
 
     private getStore(): IDataStore {
-        return this._context && this._context.store;
+        return this.getPrivate().context && this.getPrivate().context.store;
     }
 
     /**
@@ -162,31 +175,31 @@ export abstract class StorageEntity extends Entity {
             this.getState() === EntityState.LOADED ||
             this.getState() === EntityState.LOADING) {
 
-            if (this._loadingPromise) {
-                return this._loadingPromise;
+            if (this.getPrivate().loadingPromise) {
+                return this.getPrivate().loadingPromise;
             }
         } else {
             // Invalid states.
             throw `Can't load(). Entity is in invalid state: ${EntityState[this.getState()]}.`;
         }
 
-        this._loadingPromise = null;
+        this.getPrivate().loadingPromise = null;
         this.setState(EntityState.LOADING);
         var promise = this.getStore().get(this);
 
-        this._loadingPromise = promise
+        this.getPrivate().loadingPromise = promise
             .then(v => {
                 this.setState(v ? EntityState.LOADED : EntityState.NOT_LOADED);
                 return v;
             })
             .catch(err => {
                 this.setState(EntityState.NOT_LOADED);
-                this._loadingPromise = null;
-                this._error = err;
+                this.getPrivate().loadingPromise = null;
+                this.getPrivate().error = err;
                 throw err;
             });;
 
-        return this._loadingPromise;
+        return this.getPrivate().loadingPromise;
     }
 
     /**
@@ -196,7 +209,7 @@ export abstract class StorageEntity extends Entity {
     public refresh(): Promise<void> {
         // If already loaded, force refresh.
         if (this.getState() === EntityState.LOADED) {
-            this._loadingPromise = null;
+            this.getPrivate().loadingPromise = null;
         }
 
         return this.load()
@@ -212,8 +225,8 @@ export abstract class StorageEntity extends Entity {
      */
     public delete(): Promise<void> {
         if (this.getState() === EntityState.DELETING) {
-            if (this._deletingPromise) {
-                return this._deletingPromise;
+            if (this.getPrivate().deletingPromise) {
+                return this.getPrivate().deletingPromise;
             }
         } else if (!(this.getState() == EntityState.NOT_LOADED ||
             this.getState() == EntityState.LOADED)) {
@@ -223,19 +236,19 @@ export abstract class StorageEntity extends Entity {
 
         var currentState = this.getState();
         this.setState(EntityState.DELETING);
-        this._deletingPromise = this.getStore().del(this)
+        this.getPrivate().deletingPromise = this.getStore().del(this)
             .then(() => {
                 this.setState(EntityState.DELETED);
                 this.resetState();
             })
             .catch(err => {
                 this.setState(currentState);
-                this._deletingPromise = null;
-                this._error = err;
+                this.getPrivate().deletingPromise = null;
+                this.getPrivate().error = err;
                 throw err;
             });
 
-        return this._deletingPromise;
+        return this.getPrivate().deletingPromise;
     }
 
     /**
@@ -243,24 +256,24 @@ export abstract class StorageEntity extends Entity {
      * @param insert If true, save will fail if already exists. 
      */
     public save(): Promise<void> {
-        if (this._insertPromise) {
+        if (this.getPrivate().insertPromise) {
             Promise.reject("Can't save entity. insert() already in progress.");
             return;
         }
 
-        if (this._savePromise) {
-            return this._savePromise;
+        if (this.getPrivate().savePromise) {
+            return this.getPrivate().savePromise;
         }
         var promise = this._save(/* overwrite */ true)
             .then(() => {
-                this._savePromise = null;
+                this.getPrivate().savePromise = null;
             })
             .catch((err) => {
-                this._savePromise = null;
+                this.getPrivate().savePromise = null;
                 throw err;
             });
 
-        this._savePromise = promise;
+        this.getPrivate().savePromise = promise;
         return promise;
     }
 
@@ -269,26 +282,26 @@ export abstract class StorageEntity extends Entity {
      * If already exists, will fail.
      */
     public insert(): Promise<boolean> {
-        if (this._insertPromise) {
-            return this._insertPromise;
+        if (this.getPrivate().insertPromise) {
+            return this.getPrivate().insertPromise;
         }
 
-        if (this._savePromise) {
+        if (this.getPrivate().savePromise) {
             Promise.reject("Can't insert entity. Save in progress.");
             return;
         }
 
         var promise = this._save(/* overwrite */ false)
             .then((v) => {
-                this._insertPromise = null;
+                this.getPrivate().insertPromise = null;
                 return v;
             })
             .catch((err) => {
-                this._insertPromise = null;
+                this.getPrivate().insertPromise = null;
                 throw err;
             });
 
-        this._insertPromise = promise;
+        this.getPrivate().insertPromise = promise;
         return promise;
     }
 
@@ -308,7 +321,7 @@ export abstract class StorageEntity extends Entity {
                 return succeeded;
             })
             .catch(err => {
-                this._error = err;
+                this.getPrivate().error = err;
                 throw err;
             });
     }

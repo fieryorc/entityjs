@@ -10,6 +10,11 @@ Some of the notable features:
 * Provides tracking properties of entities.
 * Supports reference entities.
 
+TODO: 
+* Support for saving multiple entities
+* Querying multiple entities.
+* Move the metadata into closure.
+
 Usage
 -----
 For complete sample app: https://github.com/fieryorc/entityjs-sample

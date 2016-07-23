@@ -1,4 +1,4 @@
-import {  PrimaryKeyProperty, PropertyType, PropertyDescriptor } from "./entity";
+import {  IEntityPrivate, Entity, PrimaryKeyProperty, PropertyType, PropertyDescriptor } from "./entity";
 import { StorageEntity } from "./storageEntity";
 
 /**
@@ -43,7 +43,7 @@ export abstract class CloudStoreEntity extends StorageEntity {
         return primaryKeys[0];
     }
 
-    private static getDescriptors(entity: any): CommonTypes.IDictionary<PropertyDescriptor> {
-        return entity._propertyMetadata;
+    private static getDescriptors(entity: Entity): CommonTypes.IDictionary<PropertyDescriptor> {
+        return entity.getPrivate().propertyMetadata;
     }
 }

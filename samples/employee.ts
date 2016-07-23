@@ -123,16 +123,18 @@ var helper = new EmployeeHelper(new DataContext(new TempDataStore(storeBacking))
 // For creating google cloud datatstore, use the following.
 // var helper = new EmployeeHelper(new DataContext(new CloudDataStore("google-project-id")));
 
+var employee: EmployeeEntity;
 helper
     .addEmployee("prem", "Prem Ramanathan")
     .then(() => {
         return helper.addEmployee("prem-boss", "Prem Boss");
     })
-    .then(() => {
+    .then((e) => {
+        employee = e;
         return helper.setManager("prem", "prem-boss");
     })
     .then(() => {
-        console.log(`All completed successfully. Store = ${JSON.stringify(storeBacking)}`);
+        console.log(`All completed successfully. Employee = ${JSON.stringify(employee, Object.keys(EmployeeEntity.prototype))}`);
     })
     .catch(err => {
         console.error(`Failed ${err}`);
