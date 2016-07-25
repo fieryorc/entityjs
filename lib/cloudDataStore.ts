@@ -1,10 +1,41 @@
 import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
-import { IDataContext, IDataStore, StorageEntity } from "./storageEntity";
-import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty, PrimaryKeyProperty } from "./entity";
+import { IDataContext, IDataStore, StorageEntity, IQueryBuilder } from "./storageEntity";
+import { Entity,
+    PropertyType,
+    ValueProperty,
+    PropertyDescriptor,
+    EntityProperty,
+    PrimaryKeyProperty } from "./entity";
 import { CloudStoreEntity } from "./cloudStoreEntity";
 import { EntityHelpers } from "./entityHelpers";
 import * as lodash from "lodash";
+
+interface IFilter {
+    property: string;
+    operator?: string;
+    value: string;
+}
+
+export class CloudDataStoreQueryBuilder implements IQueryBuilder {
+    private _kind: string;
+    private _filters: IFilter[] = [];
+    kind(kind: string) {
+        this._kind = kind;
+        return this;
+    }
+    filter(property: string, value: string): CloudDataStoreQueryBuilder;
+    filter(property: string, operator: string, value: string): CloudDataStoreQueryBuilder;
+    filter(property: string, operator: string, value?: string): CloudDataStoreQueryBuilder {
+        if (!value) {
+            this._filters.push({ property: property, value: operator });
+        } else {
+            this._filters.push({ property: property, operator: operator, value: value });
+        }
+
+        return this;
+    }
+}
 
 /**
  * Implements Google Cloud Datastore.
@@ -66,10 +97,30 @@ export class CloudDataStore implements IDataStore {
         return this.doInsert(entity, true).then(v => null);
     }
 
-    public query<T>(type: { new (): T }, query: string): Promise<any[]> {
-        return new Promise<any[]>((resolve, reject) => {
-            resolve([]);
+    public query<T>(type: { new (): T }, builder: IQueryBuilder): Promise<any[]> {
+        var cq = <any>builder;
+        var storeQuery = this.store.createQuery(cq._kind);
+        cq._filters.forEach((f: IFilter) => {
+            if (f.operator) {
+                storeQuery = storeQuery.filter(f.property, f.value);
+            } else {
+                storeQuery = storeQuery.filter(f.property, f.operator, f.value);
+            }
         });
+        var queryPromise = Promise.promisify(this.store.runQuery, { context: this.store });
+        return <any>queryPromise(storeQuery)
+            .then((result: any[]) => {
+                var entities: any[] = [];
+                result.forEach(e => {
+                    entities.push(e.data);
+                });
+                this.store.runInTransaction((tn, done) => {
+                    
+                }, (err) => {
+
+                });
+                return entities;
+            });
     }
 
     private doInsert(entity: StorageEntity, overwrite: boolean): Promise<boolean> {

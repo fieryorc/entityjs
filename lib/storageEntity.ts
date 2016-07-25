@@ -57,7 +57,7 @@ export interface IDataStore {
      * Query for entities.
      * This is still Work in Progress.
      */
-    query<T>(type: { new (): T }, query: string): Promise<any[]>;
+    query<T>(type: { new (): T }, query: IQueryBuilder): Promise<any[]>;
 }
 
 /**
@@ -78,7 +78,22 @@ export interface IDataContext {
     /**
      * Query for entities.
      */
-    query<T extends StorageEntity>(type: { new (): T }): Promise<T[]>;
+    query<T extends StorageEntity>(type: { new (): T }, query: IQueryBuilder): Promise<T[]>;
+
+    /**
+     * Add entity to the context.
+     */
+    addEntity(entity: StorageEntity): void;
+
+    /**
+     * Remove entity from the context.
+     */
+    removeEntity(entity: StorageEntity): void;
+
+    /**
+     * Save all entities in the context.
+     */
+    save(): Promise<void[]>;
 }
 
 export interface IStorageEntityPrivate extends IEntityPrivate {
@@ -90,6 +105,9 @@ export interface IStorageEntityPrivate extends IEntityPrivate {
     insertPromise: Promise<boolean>;
     error: any;
     context: IDataContext;
+}
+
+export interface IQueryBuilder {
 }
 
 /**
@@ -111,10 +129,6 @@ export abstract class StorageEntity extends Entity {
                 this.getPrivate().primaryKeys.push(d);
             }
         });
-
-        if (this.getPrivate().context) {
-            this.getPrivate().context.store.validate(this);
-        }
     }
 
     public getPrivate(): IStorageEntityPrivate {
@@ -130,7 +144,7 @@ export abstract class StorageEntity extends Entity {
     /**
      * Sets the entity state.
      */
-    private setState(state: EntityState) {
+    public setState(state: EntityState) {
         this.getPrivate().entityState = state;
     }
 
@@ -155,12 +169,16 @@ export abstract class StorageEntity extends Entity {
         if (!context) {
             throw "setContext(): empty context."
         }
-
+        
+        context.addEntity(this);
         this.getPrivate().context = context;
-        this.getPrivate().context.store.validate(this);
     }
 
     private getStore(): IDataStore {
+        if (!this.getPrivate().context) {
+            throw "Entity has no context set. Did you call setContext()?."
+        }
+        
         return this.getPrivate().context && this.getPrivate().context.store;
     }
 

@@ -1,5 +1,10 @@
-import {  IEntityPrivate, Entity, PrimaryKeyProperty, PropertyType, PropertyDescriptor } from "./entity";
-import { StorageEntity } from "./storageEntity";
+import {
+    IEntityPrivate,
+    Entity,
+    PrimaryKeyProperty,
+    PropertyType,
+    PropertyDescriptor } from "./entity";
+import { IQueryBuilder, StorageEntity } from "./storageEntity";
 
 /**
  * Represents google cloud data store entity.
@@ -43,7 +48,30 @@ export abstract class CloudStoreEntity extends StorageEntity {
         return primaryKeys[0];
     }
 
+    private static getPrimaryKeyFromDescriptor(descriptors: CommonTypes.IDictionary<PropertyDescriptor>, type: string): string {
+        var primaryKeys: string[] = [];
+        for (var key in descriptors) {
+            var d = descriptors[key];
+            if (d.type == PropertyType.PRIMARY && d.name != "kind") {
+                primaryKeys.push(d.name);
+            }
+        }
+        if (primaryKeys.length > 1) {
+            throw `Only one primary key allowed. Entity(${type}) has ${primaryKeys.length}.`;
+        }
+        return primaryKeys[0];
+    }
+
     private static getDescriptors(entity: Entity): CommonTypes.IDictionary<PropertyDescriptor> {
         return entity.getPrivate().propertyMetadata;
+    }
+
+    public getQueryObject(): IQueryBuilder {
+        CloudStoreEntity
+        var primaryKey = CloudStoreEntity.getPrimaryKeyFromDescriptor(CloudStoreEntity.getDescriptors(this), this.kind);
+        return {
+            kind: this.kind,
+            key: primaryKey
+        };
     }
 }
