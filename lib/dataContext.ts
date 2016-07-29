@@ -1,4 +1,5 @@
 import { StorageEntity } from "./storageEntity";
+import { EntityHelpers } from "./entityHelpers";
 import * as Promise from "bluebird";
 import { IDataStore,
     IDataContext,
@@ -43,13 +44,19 @@ export class DataContext implements IDataContext {
      * Query for entities using the query string.
      */
     public query<T extends StorageEntity>(type: { new (): T }, query: IQueryBuilder): Promise<T[]> {
-        this._store.query(type, query)
+        return this._store.query(query)
             .then((data: any[]) => {
-                
+                var results: T[] = [];
+                if (data) {
+                    data.forEach(d => {
+                        var e = new type();
+                        e.setContext(this);
+                        EntityHelpers.loadObject(e, d);
+                        results.push(e);
+                    });
+                }
+                return results;
             });
-        return new Promise<T[]>((resolve, reject) => {
-            resolve([]);
-        });
     }
 
     /**
@@ -71,7 +78,7 @@ export class DataContext implements IDataContext {
             if (e.getState() == EntityState.LOADED ||
                 e.getState() == EntityState.NOT_LOADED ||
                 e.getChanged()) {
-                    promises.push(e.save());
+                promises.push(e.save());
             }
         })
         return Promise.all(promises);

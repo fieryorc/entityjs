@@ -1,7 +1,16 @@
 import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
-import { IDataContext, IDataStore, StorageEntity } from "./storageEntity";
-import { Entity, PropertyType, ValueProperty, PropertyDescriptor, EntityProperty, PrimaryKeyProperty } from "./entity";
+import { IEntityKey,
+    IQueryBuilder,
+    IDataContext,
+    IDataStore,
+    StorageEntity } from "./storageEntity";
+import { Entity,
+    PropertyType,
+    ValueProperty,
+    PropertyDescriptor,
+    EntityProperty,
+    PrimaryKeyProperty } from "./entity";
 import { EntityHelpers } from "./entityHelpers";
 
 /**
@@ -21,58 +30,58 @@ export class TempDataStore implements IDataStore {
         }
     }
 
-    public del(entity: StorageEntity): Promise<boolean> {
-        var key = this.getKey(entity);
-        delete this.store[key];
-        return Promise.resolve(true);
-    }
-
-    public get(entity: StorageEntity): Promise<boolean> {
-        var key = this.getKey(entity);
-        if (!(key in this.store)) {
-            return Promise.resolve(false);
-        }
-        return EntityHelpers.loadObject(entity, this.store[key])
-            .then(() => true);
-    }
-
-    public insert(entity: StorageEntity): Promise<boolean> {
-        return this.doInsert(entity, false)
-            .then(() => true)
-            .catch(err => false);
-    }
-
-    public save(entity: StorageEntity): Promise<void> {
-        return <any>this.doInsert(entity, true);
-    }
-
-    public query<T>(type: { new (): T }, query: string): Promise<any[]> {
-        return new Promise<any[]>((resolve, reject) => {
-            resolve([]);
-        });
-    }
-
-    private doInsert(entity: StorageEntity, overwrite: boolean): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            var key = this.getKey(entity);
-
-            if (!overwrite && (key in this.store)) {
-                reject(`Entity key(${key})already exists.`);
-                return;
-            }
-
-            this.store[key] = EntityHelpers.getObject(
-                <StorageEntity>entity, /* validate */ true, /* includeRef */ true, ["kind"]);
-            resolve();
-        });
-    }
-
-    private getKey(entity: StorageEntity): string {
+    public getKey(entity: StorageEntity): IEntityKey {
         var key = "";
         var primaryKeyDescriptors = entity.getPrimaryKeys();
         for (var i = primaryKeyDescriptors.length - 1; i >= 0; i--) {
             key += (!key ? "" : ".") + entity.getPropertyValue<string>(primaryKeyDescriptors[i].name);
         }
-        return key;
+        return {
+            stringValue: key
+        };
+    }
+
+    public getData(entity: StorageEntity): any {
+        return EntityHelpers.getObject(entity, true, true, ["kind"]);
+    }
+
+    public del(key: IEntityKey): Promise<boolean> {
+        delete this.store[key.stringValue];
+        return Promise.resolve(true);
+    }
+
+    public get(key: IEntityKey): Promise<any> {
+        if (!(key.stringValue in this.store)) {
+            return Promise.resolve(false);
+        }
+        return Promise.resolve(this.store[key.stringValue]);
+    }
+
+    public insert(key: IEntityKey, data: any): Promise<boolean> {
+        return this.doInsert(key, data, false)
+            .then(() => true)
+            .catch(err => false);
+    }
+
+    public save(key: IEntityKey, data: any): Promise<void> {
+        return <any>this.doInsert(key, data, true);
+    }
+
+    public query<T>(builder: IQueryBuilder): Promise<any[]> {
+        return new Promise<any[]>((resolve, reject) => {
+            resolve([]);
+        });
+    }
+
+    private doInsert(key: IEntityKey, data: any, overwrite: boolean): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            if (!overwrite && (key.stringValue in this.store)) {
+                reject(`Entity key(${key})already exists.`);
+                return;
+            }
+
+            this.store[key.stringValue] = data;
+            resolve();
+        });
     }
 }

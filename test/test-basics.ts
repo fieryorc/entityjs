@@ -33,6 +33,9 @@ describe('entity-tests', function () {
         context = new DataContext(dataStore);
     });
 
+    afterEach(() => {
+        // console.log(`Datastore = ${JSON.stringify(dataStoreObject)}`);
+    });
     it("save-simple", function (done) {
         var user = new UserEntity();
         user.setContext(context);
@@ -94,6 +97,7 @@ describe('entity-tests', function () {
             })
             .then(() => {
                 should.equal(EntityState.DELETED, user.getState());
+                should.equal(undefined, dataStoreObject["user.fieryorc"]);
                 done();
             })
             .catch(err => done(err));
@@ -105,16 +109,16 @@ describe('entity-tests', function () {
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
         user.save()
-        .then(() => {
-            should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
-            dataStoreObject["user.fieryorc"].name = "Prem (modified) Ramanathan";
-            return user.refresh();
-        })
-        .then(() => {
-            should.equal("Prem (modified) Ramanathan", user.name);
-            done();
-        })
-        .catch(err => done(err));
+            .then(() => {
+                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
+                dataStoreObject["user.fieryorc"].name = "Prem (modified) Ramanathan";
+                return user.refresh();
+            })
+            .then(() => {
+                should.equal("Prem (modified) Ramanathan", user.name);
+                done();
+            })
+            .catch(err => done(err));
     });
 
     it("change-tracking", function (done) {

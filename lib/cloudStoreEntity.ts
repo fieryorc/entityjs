@@ -65,13 +65,4 @@ export abstract class CloudStoreEntity extends StorageEntity {
     private static getDescriptors(entity: Entity): CommonTypes.IDictionary<PropertyDescriptor> {
         return entity.getPrivate().propertyMetadata;
     }
-
-    public getQueryObject(): IQueryBuilder {
-        CloudStoreEntity
-        var primaryKey = CloudStoreEntity.getPrimaryKeyFromDescriptor(CloudStoreEntity.getDescriptors(this), this.kind);
-        return {
-            kind: this.kind,
-            key: primaryKey
-        };
-    }
 }

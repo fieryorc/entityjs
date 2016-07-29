@@ -4,6 +4,7 @@ import { Entity,
     ValueProperty,
     PropertyDescriptor,
     EntityProperty } from "./entity";
+import { EntityHelpers } from "./entityHelpers";
 import * as Promise from "bluebird";
 
 export enum EntityState {
@@ -24,6 +25,21 @@ export enum EntityState {
 }
 
 /**
+ * Information to uniquely represent the entity in the data store.
+ */
+export interface IEntityKey {
+    /**
+     * Returns the string representation of the key.
+     * This key is used in caching.
+     */
+    stringValue: string;
+}
+
+export interface IEntityData {
+
+}
+
+/**
  * Interface that provides storage specific APIs.
  */
 export interface IDataStore {
@@ -34,30 +50,39 @@ export interface IDataStore {
     validate(entity: StorageEntity): void;
 
     /**
+     * Gets the key that represents the eneity.
+     */
+    getKey(entity: StorageEntity): IEntityKey;
+
+    /**
+     * Returns the storage representation of the data.
+     */
+    getData(entity: StorageEntity): IEntityData;
+
+    /**
      * Delete the entity from store.
      */
-    del(entity: StorageEntity): Promise<boolean>;
+    del(key: IEntityKey): Promise<boolean>;
 
     /**
      * Load the entity from store.
      */
-    get(entity: StorageEntity): Promise<boolean>;
+    get(key: IEntityKey): Promise<IEntityData>;
 
     /**
      * Insert entity into the store.
      */
-    insert(entity: StorageEntity): Promise<boolean>;
+    insert(key: IEntityKey, data: IEntityData): Promise<boolean>;
 
     /**
      * Save the entity into the store.
      */
-    save(entity: StorageEntity): Promise<void>;
+    save(key: IEntityKey, data: IEntityData): Promise<void>;
 
     /**
      * Query for entities.
-     * This is still Work in Progress.
      */
-    query<T>(type: { new (): T }, query: IQueryBuilder): Promise<any[]>;
+    query<T>(query: IQueryBuilder): Promise<IEntityData[]>;
 }
 
 /**
@@ -81,7 +106,19 @@ export interface IDataContext {
     query<T extends StorageEntity>(type: { new (): T }, query: IQueryBuilder): Promise<T[]>;
 
     /**
+     * Save all entities in the context.
+     */
+    save(entities: StorageEntity[]): Promise<void[]>;
+}
+
+/**
+ * Interface that must be implemented by DataContext.
+ */
+export interface IDataContextExtended extends IDataContext {
+
+    /**
      * Add entity to the context.
+     * Use entity.setContext() method instead.
      */
     addEntity(entity: StorageEntity): void;
 
@@ -89,11 +126,6 @@ export interface IDataContext {
      * Remove entity from the context.
      */
     removeEntity(entity: StorageEntity): void;
-
-    /**
-     * Save all entities in the context.
-     */
-    save(): Promise<void[]>;
 }
 
 export interface IStorageEntityPrivate extends IEntityPrivate {
@@ -104,10 +136,11 @@ export interface IStorageEntityPrivate extends IEntityPrivate {
     savePromise: Promise<void>;
     insertPromise: Promise<boolean>;
     error: any;
-    context: IDataContext;
+    context: IDataContextExtended;
 }
 
 export interface IQueryBuilder {
+    getQueryString(): string;
 }
 
 /**
@@ -169,16 +202,16 @@ export abstract class StorageEntity extends Entity {
         if (!context) {
             throw "setContext(): empty context."
         }
-        
-        context.addEntity(this);
-        this.getPrivate().context = context;
+
+        this.getPrivate().context = <IDataContextExtended>context;
+        this.getPrivate().context.addEntity(this);
     }
 
     private getStore(): IDataStore {
         if (!this.getPrivate().context) {
             throw "Entity has no context set. Did you call setContext()?."
         }
-        
+
         return this.getPrivate().context && this.getPrivate().context.store;
     }
 
@@ -203,12 +236,18 @@ export abstract class StorageEntity extends Entity {
 
         this.getPrivate().loadingPromise = null;
         this.setState(EntityState.LOADING);
-        var promise = this.getStore().get(this);
+        var key = this.getStore().getKey(this);
+        var promise = this.getStore().get(key);
 
         this.getPrivate().loadingPromise = promise
             .then(v => {
-                this.setState(v ? EntityState.LOADED : EntityState.NOT_LOADED);
-                return v;
+                if (!v) {
+                    this.setState(EntityState.NOT_LOADED);
+                    return false;
+                }
+                EntityHelpers.loadObject(this, v);
+                this.setState(EntityState.LOADED);
+                return !!v;
             })
             .catch(err => {
                 this.setState(EntityState.NOT_LOADED);
@@ -254,7 +293,8 @@ export abstract class StorageEntity extends Entity {
 
         var currentState = this.getState();
         this.setState(EntityState.DELETING);
-        this.getPrivate().deletingPromise = this.getStore().del(this)
+        var key = this.getStore().getKey(this);
+        this.getPrivate().deletingPromise = this.getStore().del(key)
             .then(() => {
                 this.setState(EntityState.DELETED);
                 this.resetState();
@@ -330,8 +370,9 @@ export abstract class StorageEntity extends Entity {
         } else {
             throw `Can't save entity: Invalid state: ${EntityState[this.getState()]}.`;
         }
-
-        var promise = overwrite ? <Promise<boolean>><any>this.getStore().save(this) : this.getStore().insert(this);
+        var key = this.getStore().getKey(this);
+        var data = this.getStore().getData(this);
+        var promise = overwrite ? <Promise<boolean>><any>this.getStore().save(key, data) : this.getStore().insert(key, data);
         return promise
             .then((succeeded) => {
                 this.setState(EntityState.LOADED);

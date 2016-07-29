@@ -1,6 +1,11 @@
 import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
-import { IDataContext, IDataStore, StorageEntity, IQueryBuilder } from "./storageEntity";
+import { IDataContext,
+    IEntityData,
+    IEntityKey,
+    IDataStore,
+    StorageEntity,
+    IQueryBuilder } from "./storageEntity";
 import { Entity,
     PropertyType,
     ValueProperty,
@@ -17,13 +22,25 @@ interface IFilter {
     value: string;
 }
 
+interface ICloudEntityKey extends IEntityKey {
+    kind: string;
+    key: string;
+}
+
+interface ICloudQueryBuilder extends IQueryBuilder {
+    _kind: string;
+    _filters: IFilter[];
+}
+
 export class CloudDataStoreQueryBuilder implements IQueryBuilder {
     private _kind: string;
     private _filters: IFilter[] = [];
+
     kind(kind: string) {
         this._kind = kind;
         return this;
     }
+
     filter(property: string, value: string): CloudDataStoreQueryBuilder;
     filter(property: string, operator: string, value: string): CloudDataStoreQueryBuilder;
     filter(property: string, operator: string, value?: string): CloudDataStoreQueryBuilder {
@@ -34,6 +51,11 @@ export class CloudDataStoreQueryBuilder implements IQueryBuilder {
         }
 
         return this;
+    }
+
+    public getQueryString() {
+        // TODO: improve.
+        return JSON.stringify(this);
     }
 }
 
@@ -60,45 +82,54 @@ export class CloudDataStore implements IDataStore {
         }
     }
 
-    public del(entity: StorageEntity): Promise<boolean> {
+    public getKey(entity: StorageEntity): IEntityKey {
         var cEntity = <CloudStoreEntity>entity;
+        var key: ICloudEntityKey = {
+            kind: cEntity.kind,
+            key: this.getPrimaryKeyValue<string>(cEntity),
+            stringValue: null
+        };
+        key.stringValue = JSON.stringify(key);
+        return key;
+    }
+
+    public getData(entity: StorageEntity): IEntityData {
+        return EntityHelpers.getObject(entity, true, true, ["kind"]);
+    }
+
+    public del(key: IEntityKey): Promise<boolean> {
         var delPromise = Promise.promisify(this.store.delete, { context: this.store });
-        var key = this.store.key([cEntity.kind, this.getKey<string>(cEntity)]);
-        return delPromise(key)
+        var cKey: ICloudEntityKey = <ICloudEntityKey>key;
+        var storeKey = this.store.key([cKey.kind, cKey.key]);
+        return delPromise(storeKey)
             .catch(err => {
                 throw this.convertError(err);
             });
     }
 
-    public get(entity: StorageEntity): Promise<boolean> {
-        var cEntity = <CloudStoreEntity>entity;
+    public get(key: IEntityKey): Promise<IEntityData> {
+        var cKey: ICloudEntityKey = <ICloudEntityKey>key;
         var getPromise = Promise.promisify(this.store.get, { context: this.store });
-        var key = this.store.key([cEntity.kind, this.getKey<string>(cEntity)]);
-        return getPromise(key)
+        var storeKey = this.store.key([cKey.kind, cKey.key]);
+        return getPromise(storeKey)
             .then((v: any) => {
-                if (!v) {
-                    return false;
-                }
-
-                var obj = v.data;
-                return EntityHelpers.loadObject(cEntity, v.data)
-                    .then(() => true);
+                return v && v.data;
             })
             .catch(err => {
                 throw this.convertError(err);
             });;
     }
 
-    public insert(entity: StorageEntity): Promise<boolean> {
-        return this.doInsert(entity, false);
+    public insert(key: IEntityKey, data: IEntityData): Promise<boolean> {
+        return this.doInsert(<ICloudEntityKey>key, data, false);
     }
 
-    public save(entity: StorageEntity): Promise<void> {
-        return this.doInsert(entity, true).then(v => null);
+    public save(key: IEntityKey, data: IEntityData): Promise<void> {
+        return this.doInsert(<ICloudEntityKey>key, data, true).then(v => null);
     }
 
-    public query<T>(type: { new (): T }, builder: IQueryBuilder): Promise<any[]> {
-        var cq = <any>builder;
+    public query<T>(builder: IQueryBuilder): Promise<IEntityData[]> {
+        var cq = <ICloudQueryBuilder>builder;
         var storeQuery = this.store.createQuery(cq._kind);
         cq._filters.forEach((f: IFilter) => {
             if (f.operator) {
@@ -115,29 +146,25 @@ export class CloudDataStore implements IDataStore {
                     entities.push(e.data);
                 });
                 this.store.runInTransaction((tn, done) => {
-                    
-                }, (err) => {
 
+                }, (err) => {
                 });
                 return entities;
             });
     }
 
-    private doInsert(entity: StorageEntity, overwrite: boolean): Promise<boolean> {
-        var cEntity = <CloudStoreEntity>entity;
-        var id = this.getKey<string>(cEntity);
-        var key = this.store.key(id ? [cEntity.kind, id] : cEntity.kind);
+    private doInsert(key: ICloudEntityKey, data: IEntityData, overwrite: boolean): Promise<boolean> {
+        var id = key.key;
+        var storeKey = this.store.key(id ? [key.kind, id] : key.kind);
         var keyStr = JSON.stringify(key);
         var insertPromise = Promise.promisify(overwrite ? this.store.upsert : this.store.insert,
             { context: this.store });
         // TODO: Check return values.
-        var storageObj = EntityHelpers.getObject(cEntity, /* validate */ true, /* includeRef */ true, ["kind"])
-        return <any>insertPromise({ key: key, data: storageObj })
+        return <any>insertPromise({ key: storeKey, data: data })
             .catch(err => { throw this.convertError(err); });;
     }
 
     private convertError(err: any): CommonTypes.PromiseError {
-
         if (lodash.isString(err)) {
             return err;
         }
@@ -149,9 +176,8 @@ export class CloudDataStore implements IDataStore {
         };
     }
 
-    private getKey<T>(entity: StorageEntity): T {
+    private getPrimaryKeyValue<T>(entity: StorageEntity): T {
         var propName = entity.getPrimaryKeys()[0].name;
         return <T>entity.getPropertyValue(propName);
     }
-
 }
