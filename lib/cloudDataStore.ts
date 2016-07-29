@@ -97,7 +97,7 @@ export class CloudDataStore implements IDataStore {
         return EntityHelpers.getObject(entity, true, true, ["kind"]);
     }
 
-    public del(key: IEntityKey): Promise<boolean> {
+    public del(key: IEntityKey): Promise<void> {
         var delPromise = Promise.promisify(this.store.delete, { context: this.store });
         var cKey: ICloudEntityKey = <ICloudEntityKey>key;
         var storeKey = this.store.key([cKey.kind, cKey.key]);

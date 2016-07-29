@@ -25,7 +25,7 @@ var dataStoreObject: any;
 var context: DataContext;
 var dataStore: IDataStore;
 
-describe('entity-tests', function () {
+describe('basic-tests', function () {
 
     beforeEach(() => {
         dataStoreObject = {};
@@ -42,6 +42,23 @@ describe('entity-tests', function () {
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
         user.save()
+            .then(() => {
+                should.equal(EntityState.LOADED, user.getState());
+                should.equal(false, user.getChanged());
+                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
+                should.equal("Prem Ramanathan", dataStoreObject["user.fieryorc"].name);
+                done();
+            })
+            .catch(err => done(err));
+    });
+
+    it("load-simple", function (done) {
+        var user = new UserEntity();
+        user.setContext(context);
+        user.id = "fieryorc";
+        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc", name: "Prem Ramanathan" };
+
+        user.load()
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
@@ -72,6 +89,8 @@ describe('entity-tests', function () {
         var user = new UserEntity();
         user.setContext(context);
         user.id = "fieryorc";
+        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc", name: "Prem Ramanathan" };
+
         user.delete()
             .then(() => {
                 should.equal(EntityState.DELETED, user.getState());
@@ -85,6 +104,17 @@ describe('entity-tests', function () {
             .then(() => true)
             .catch(err => false)
             .then(succeeded => succeeded ? done("save() should not succeed after delete.") : done());
+    });
+
+    it("delete-error", function (done) {
+        var user = new UserEntity();
+        user.setContext(context);
+        user.id = "fieryorc";
+        user.delete()
+            .then(() => {
+                done("delete() should not succeed when there is no data to delete.");
+            })
+            .catch(err => done());
     });
 
     it("delete-loaded-entity", function (done) {

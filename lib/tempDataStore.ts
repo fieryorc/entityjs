@@ -45,9 +45,12 @@ export class TempDataStore implements IDataStore {
         return EntityHelpers.getObject(entity, true, true, ["kind"]);
     }
 
-    public del(key: IEntityKey): Promise<boolean> {
+    public del(key: IEntityKey): Promise<void> {
+        if (!(key.stringValue in this.store)) {
+            return Promise.reject(`TempDataStore.del(): Entity with ${key.stringValue} not found.`);
+        }
         delete this.store[key.stringValue];
-        return Promise.resolve(true);
+        return Promise.resolve();
     }
 
     public get(key: IEntityKey): Promise<any> {
