@@ -45,6 +45,8 @@ describe('entity-tests', function () {
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
+                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
+                should.equal("Prem Ramanathan", dataStoreObject["user.fieryorc"].name);
                 done();
             })
             .catch(err => done(err));
@@ -59,6 +61,8 @@ describe('entity-tests', function () {
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
+                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
+                should.equal("Prem Ramanathan", dataStoreObject["user.fieryorc"].name);
                 done();
             })
             .catch(err => done(err));
@@ -72,6 +76,7 @@ describe('entity-tests', function () {
             .then(() => {
                 should.equal(EntityState.DELETED, user.getState());
                 should.equal(false, user.getChanged());
+                should.equal(undefined, dataStoreObject["user.fieryorc"]);
             })
             .catch(err => done(err))
             .then(() => {
@@ -153,19 +158,15 @@ describe('entity-tests', function () {
         dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc" };
         user.insert()
             .then((v) => {
-                if (v) {
-                    throw "Insert should not succeed when there is a conflict.";
-                } else {
-                    console.log("Insert failed with conflict.");
-                }
+                should.equal(false, v, "Insert should not succeed when there is a conflict.");
             })
             .then(() => {
-                console.log("Insert failed. Trying save... ");
+                // console.log("Insert failed. Trying save... ");
                 return user.save();
             })
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
-                console.log(`Save succeeded.`);
+                //console.log(`Save succeeded.`);
                 done();
             })
             .catch(err => {
