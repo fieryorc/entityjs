@@ -12,15 +12,17 @@ import { IDataStore,
  * Provides context for entities. Context provides the remote store.
  */
 export class DataContext implements IDataContextExtended {
+    private _useCache: boolean;
     private _store: IDataStore;
     private _entityMap: Map<StorageEntity, StorageEntity>;
     private _dataCache: Map<string, IEntityData>;
 
-    public constructor(store: IDataStore) {
+    public constructor(store: IDataStore, disableCache?: boolean) {
         if (!store) {
             throw "DataContext(): store is empty."
         }
 
+        this._useCache = !disableCache;
         this._store = store;
         this._entityMap = new Map<StorageEntity, StorageEntity>();
         this._dataCache = new Map<string, any>();
@@ -94,7 +96,7 @@ export class DataContext implements IDataContextExtended {
                 }
             });
         }
-        
+
         return Promise.all(promises);
     }
 
@@ -135,12 +137,14 @@ export class DataContext implements IDataContextExtended {
     }
 
     public _get(key: IEntityKey): Promise<IEntityData> {
-        if (this._dataCache.has(key.stringValue)) {
+        if (this._useCache && this._dataCache.has(key.stringValue)) {
             return Promise.resolve(this._dataCache.get(key.stringValue));
         }
 
         return this._store.get(key).then(d => {
-            this._dataCache.set(key.stringValue, d);
+            if (this._useCache) {
+                this._dataCache.set(key.stringValue, d);
+            }
             return d;
         });
     }
@@ -148,7 +152,7 @@ export class DataContext implements IDataContextExtended {
     public _del(key: IEntityKey): Promise<void> {
         return this._store.del(key)
             .then(() => {
-                if (this._dataCache.has(key.stringValue)) {
+                if (this._useCache && this._dataCache.has(key.stringValue)) {
                     this._dataCache.delete(key.stringValue);
                 }
             });
@@ -157,7 +161,7 @@ export class DataContext implements IDataContextExtended {
     public _insert(key: IEntityKey, data: IEntityData): Promise<boolean> {
         return this._store.insert(key, data)
             .then((v) => {
-                if (v) {
+                if (this._useCache && v) {
                     this._dataCache.set(key.stringValue, data);
                 }
                 return v;
@@ -167,7 +171,9 @@ export class DataContext implements IDataContextExtended {
     public _save(key: IEntityKey, data: IEntityData): Promise<void> {
         return this._store.save(key, data)
             .then(() => {
-                this._dataCache.set(key.stringValue, data);
+                if (this._useCache) {
+                    this._dataCache.set(key.stringValue, data);
+                }
             });
     }
 }

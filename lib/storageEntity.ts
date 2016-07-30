@@ -368,7 +368,8 @@ export abstract class StorageEntity extends Entity {
 
     /**
      * Insert this entity into the data store.
-     * If already exists, will fail.
+     * If already exists, will return false.
+     * Promise will fail when there are other errors.
      */
     public insert(): Promise<boolean> {
         if (this.getPrivate().insertPromise) {
