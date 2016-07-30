@@ -27,7 +27,7 @@ gulp.task("build", function () {
         .pipe(concat("index.tmp.d.ts"))
         .pipe(gulp.dest(bindir));
 
-    var copyFiles = gulp.src(["package.json", "README.md"])
+    var copyFiles = gulp.src(["package.json", "README.md", "tools/gen/index.d.ts"])
         .pipe(gulp.dest(distdir));
 
     return merge(tsOutput, dtsOutput, copyFiles)
