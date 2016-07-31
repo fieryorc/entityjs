@@ -4,28 +4,30 @@ import * as Promise from "bluebird";
 import { IDataStore,
     IEntityKey,
     IEntityData,
+    IDataContext,
     IDataContextExtended,
     IQueryBuilder,
     EntityState } from "./storageEntity";
+import { IDataCache } from "./interfaces";
+import { TimedCache  } from "./dataCache";
 
 /**
- * Provides context for entities. Context provides the remote store.
+ * Context provides a way to group entities and share data. All entities within
+ * the context share the cache. If you don't want to disable 
  */
-export class DataContext implements IDataContextExtended {
-    private _useCache: boolean;
+class DataContext implements IDataContextExtended {
     private _store: IDataStore;
     private _entityMap: Map<StorageEntity, StorageEntity>;
-    private _dataCache: Map<string, IEntityData>;
+    private _dataCache: IDataCache<string, IEntityData>;
 
-    public constructor(store: IDataStore, disableCache?: boolean) {
+    public constructor(store: IDataStore, cache: IDataCache<string, IEntityData>) {
         if (!store) {
             throw "DataContext(): store is empty."
         }
 
-        this._useCache = !disableCache;
         this._store = store;
         this._entityMap = new Map<StorageEntity, StorageEntity>();
-        this._dataCache = new Map<string, any>();
+        this._dataCache = cache;
     }
 
     /**
@@ -137,12 +139,12 @@ export class DataContext implements IDataContextExtended {
     }
 
     public _get(key: IEntityKey): Promise<IEntityData> {
-        if (this._useCache && this._dataCache.has(key.stringValue)) {
+        if (this._dataCache && this._dataCache.has(key.stringValue)) {
             return Promise.resolve(this._dataCache.get(key.stringValue));
         }
 
         return this._store.get(key).then(d => {
-            if (this._useCache) {
+            if (this._dataCache) {
                 this._dataCache.set(key.stringValue, d);
             }
             return d;
@@ -152,7 +154,7 @@ export class DataContext implements IDataContextExtended {
     public _del(key: IEntityKey): Promise<void> {
         return this._store.del(key)
             .then(() => {
-                if (this._useCache && this._dataCache.has(key.stringValue)) {
+                if (this._dataCache && this._dataCache.has(key.stringValue)) {
                     this._dataCache.delete(key.stringValue);
                 }
             });
@@ -161,7 +163,7 @@ export class DataContext implements IDataContextExtended {
     public _insert(key: IEntityKey, data: IEntityData): Promise<boolean> {
         return this._store.insert(key, data)
             .then((v) => {
-                if (this._useCache && v) {
+                if (this._dataCache && v) {
                     this._dataCache.set(key.stringValue, data);
                 }
                 return v;
@@ -171,9 +173,20 @@ export class DataContext implements IDataContextExtended {
     public _save(key: IEntityKey, data: IEntityData): Promise<void> {
         return this._store.save(key, data)
             .then(() => {
-                if (this._useCache) {
+                if (this._dataCache) {
                     this._dataCache.set(key.stringValue, data);
                 }
             });
     }
+}
+
+/**
+ * Creates new DataContext.
+ * @param store Store to use.
+ * @param cacheTimeout Cache timeout in milliseconds. Defaults to 0 (no cache).
+ *        If nonzero value, then datacontext will keep the data for the specified
+ *        time.
+ */
+export function createDataContext(store: IDataStore, cacheTimeout?: number) : IDataContext {
+    return new DataContext(store, cacheTimeout ? new TimedCache(cacheTimeout) : null);
 }

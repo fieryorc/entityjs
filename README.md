@@ -9,10 +9,7 @@ Some of the notable features:
 * Supports Google Cloud store.
 * Provides tracking properties of entities.
 * Supports reference entities.
-
-TODO: 
-* Support for saving multiple entities
-* Querying multiple entities.
+* Supports local caching.
 
 Usage
 -----
@@ -56,10 +53,10 @@ class EmployeeEntity extends CloudStoreEntity {
 ## Creating new context
 ```
 // Create a new context. Context provides the necessary bindings to the datastore. 
-// entityjs comes with two data stores. TempDataStore and CloudDataStore.
+// entityjs comes with two data stores. InMemoryDataStore and CloudDataStore.
 // You need to set context for entities to use functions that interact with the store (load, save, etc).
 
-var context = new DataContext(new TempDataStore({}}));
+var context = new DataContext(new InMemoryDataStore({}, /* disable_cache */ true }));
 ```
 
 ## Adding new entity to DB

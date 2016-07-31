@@ -412,59 +412,47 @@ export declare class CloudDataStore implements IDataStore {
 }
 
 /**
- * Provides context for entities. Context provides the remote store.
+ * Interface for representing a cache for DataContext.
  */
-export declare class DataContext implements IDataContextExtended {
-    private _useCache;
-    private _store;
-    private _entityMap;
-    private _dataCache;
-    constructor(store: IDataStore, disableCache?: boolean);
-    /**
-     * Gets the store object.
-     */
-    store: IDataStore;
-    /**
-     * Creates new entity.
-     */
-    create<T extends StorageEntity>(type: {
-        new (): T;
-    }): T;
-    /**
-     * Loads a given entity.
-     */
-    load<T extends StorageEntity>(type: {
-        new (): T;
-    }): Promise<T>;
-    /**
-     * Query for entities using the query string.
-     */
-    query<T extends StorageEntity>(type: {
-        new (): T;
-    }, query: IQueryBuilder): Promise<T[]>;
-    /**
-     * Save all the entities in the context.
-     */
-    save(entities: StorageEntity[]): Promise<void[]>;
-    /**
-     * Checks if the entity is part of the context.
-     */
-    has(entity: StorageEntity): boolean;
-    _key(entity: StorageEntity): IEntityKey;
-    _data(entity: StorageEntity): IEntityData;
-    _add(entity: StorageEntity): void;
-    _remove(entity: StorageEntity): void;
-    _get(key: IEntityKey): Promise<IEntityData>;
-    _del(key: IEntityKey): Promise<void>;
-    _insert(key: IEntityKey, data: IEntityData): Promise<boolean>;
-    _save(key: IEntityKey, data: IEntityData): Promise<void>;
+export interface IDataCache<K, V> {
+    get(key: K): V;
+    set(key: K, value: V): void;
+    has(key: K): boolean;
+    delete(key: K): void;
 }
+
+/**
+ * A simple timeout based cache. Data older than timeout will be purged from cache.
+ */
+export declare class TimedCache<K, V> implements IDataCache<K, V> {
+    private timeout;
+    private dataCache;
+    /**
+     * Creates new instance of TimedCache.
+     * @param timeout Timeout in milliseconds.
+     */
+    constructor(timeout: number);
+    get(key: K): V;
+    set(key: K, value: V): void;
+    has(key: K): boolean;
+    delete(key: K): void;
+    private _get(key);
+}
+
+/**
+ * Creates new DataContext.
+ * @param store Store to use.
+ * @param cacheTimeout Cache timeout in milliseconds. Defaults to 0 (no cache).
+ *        If nonzero value, then datacontext will keep the data for the specified
+ *        time.
+ */
+export declare function createDataContext(store: IDataStore, cacheTimeout?: number): IDataContext;
 
 /**
  * Implements Temporary store based on object storage.
  * Any StorageEntity can use this store.
  */
-export declare class TempDataStore implements IDataStore {
+export declare class InMemoryDataStore implements IDataStore {
     private store;
     constructor(obj?: any);
     validate(entity: StorageEntity): void;
@@ -488,3 +476,4 @@ declare module CommonTypes {
         stack: string;
     }
 }
+

@@ -9,8 +9,9 @@ import {
     ValueProperty,
     ReferenceProperty,
     PrimaryKeyProperty,
-    DataContext,
-    TempDataStore
+    IDataContext,
+    InMemoryDataStore,
+    createDataContext
 } from "../main";
 import {
     UserEntity,
@@ -22,15 +23,15 @@ var should = chai.should();
 chai.use(chaiHttp);
 
 var dataStoreObject: any;
-var context: DataContext;
+var context: IDataContext;
 var dataStore: IDataStore;
 
 describe('caching-tests', function () {
 
     beforeEach(() => {
         dataStoreObject = {};
-        dataStore = new TempDataStore(dataStoreObject);
-        context = new DataContext(dataStore);
+        dataStore = new InMemoryDataStore(dataStoreObject);
+        context = createDataContext(dataStore, 10000);
     });
 
     afterEach(() => {
@@ -160,8 +161,8 @@ describe('caching-tests', function () {
     // Make sure disabling cache works.
     it("test-cache-disable", function (done) {
         dataStoreObject = {};
-        dataStore = new TempDataStore(dataStoreObject);
-        context = new DataContext(dataStore, /* disable cache */ true);
+        dataStore = new InMemoryDataStore(dataStoreObject);
+        context = createDataContext(dataStore);
 
         var user = new UserEntity();
         user.setContext(context);

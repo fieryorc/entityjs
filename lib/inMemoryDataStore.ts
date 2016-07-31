@@ -17,7 +17,7 @@ import { EntityHelpers } from "./entityHelpers";
  * Implements Temporary store based on object storage.
  * Any StorageEntity can use this store.
  */
-export class TempDataStore implements IDataStore {
+export class InMemoryDataStore implements IDataStore {
     private store: any;
     public constructor(obj?: any) {
         this.store = obj || {};
@@ -47,7 +47,7 @@ export class TempDataStore implements IDataStore {
 
     public del(key: IEntityKey): Promise<void> {
         if (!(key.stringValue in this.store)) {
-            return Promise.reject(`TempDataStore.del(): Entity with ${key.stringValue} not found.`);
+            return Promise.reject(`InMemoryDataStore.del(): Entity with ${key.stringValue} not found.`);
         }
         delete this.store[key.stringValue];
         return Promise.resolve();

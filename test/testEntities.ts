@@ -1,5 +1,5 @@
 import * as Promise from "bluebird";
-import { CloudStoreEntity, ValueProperty, ReferenceProperty, PrimaryKeyProperty, DataContext, TempDataStore } from "../main";
+import { CloudStoreEntity, ValueProperty, ReferenceProperty, PrimaryKeyProperty, IDataContext, InMemoryDataStore } from "../main";
 
 
 export class UserEntity extends CloudStoreEntity {

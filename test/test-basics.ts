@@ -9,8 +9,9 @@ import {
     ValueProperty,
     ReferenceProperty,
     PrimaryKeyProperty,
-    DataContext,
-    TempDataStore
+    IDataContext,
+    InMemoryDataStore,
+    createDataContext
 } from "../main";
 import {
     UserEntity,
@@ -22,15 +23,15 @@ var should = chai.should();
 chai.use(chaiHttp);
 
 var dataStoreObject: any;
-var context: DataContext;
+var context: IDataContext;
 var dataStore: IDataStore;
 
 describe('basic-tests', function () {
 
     beforeEach(() => {
         dataStoreObject = {};
-        dataStore = new TempDataStore(dataStoreObject);
-        context = new DataContext(dataStore);
+        dataStore = new InMemoryDataStore(dataStoreObject);
+        context = createDataContext(dataStore);
     });
 
     afterEach(() => {
