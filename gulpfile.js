@@ -39,5 +39,5 @@ gulp.task("default", ["build"]);
 
 gulp.task("watch", ["build"], function() {
     process.chdir(__dirname);
-    gulp.watch(["**/*.ts"], ["build"]);
+    gulp.watch(["**/*.ts", "!bin/**"], ["build"]);
 });

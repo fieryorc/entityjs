@@ -1,5 +1,5 @@
 
-export { CloudDataStore } from "./lib/cloudDataStore";
+export { CloudDataStore, CloudDataStoreQueryBuilder } from "./lib/cloudDataStore";
 export { CloudStoreEntity } from "./lib/cloudStoreEntity";
 export { createDataContext } from "./lib/dataContext";
 export { Entity,

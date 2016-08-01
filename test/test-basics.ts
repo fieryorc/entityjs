@@ -37,6 +37,29 @@ describe('basic-tests', function () {
     afterEach(() => {
         // console.log(`Datastore = ${JSON.stringify(dataStoreObject)}`);
     });
+
+    function addUser(id: string, name: string) {
+        var stringValue = "user." + id;
+        dataStoreObject[stringValue] = {
+            key: {
+                kind: "user",
+                id: id,
+                stringValue: stringValue
+            },
+            data: {
+                name: name
+            }
+        };
+    }
+
+    function verifyUser(id: string, name: string) {
+        var stringValue = "user." + id;
+        should.equal(id, dataStoreObject[stringValue].key.id);
+        should.equal("user", dataStoreObject[stringValue].key.kind);
+        should.equal(stringValue, dataStoreObject[stringValue].key.stringValue);
+        should.equal(name, dataStoreObject[stringValue].data.name);
+    }
+
     it("save-simple", function (done) {
         var user = new UserEntity();
         user.setContext(context);
@@ -46,8 +69,7 @@ describe('basic-tests', function () {
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
-                should.equal("Prem Ramanathan", dataStoreObject["user.fieryorc"].name);
+                verifyUser("fieryorc", "Prem Ramanathan");
                 done();
             })
             .catch(err => done(err));
@@ -57,14 +79,14 @@ describe('basic-tests', function () {
         var user = new UserEntity();
         user.setContext(context);
         user.id = "fieryorc";
-        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc", name: "Prem Ramanathan" };
+        addUser("fieryorc", "Prem Ramanathan");
 
         user.load()
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
-                should.equal("Prem Ramanathan", dataStoreObject["user.fieryorc"].name);
+                should.equal("fieryorc", user.id);
+                should.equal("Prem Ramanathan", user.name);
                 done();
             })
             .catch(err => done(err));
@@ -79,8 +101,7 @@ describe('basic-tests', function () {
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
-                should.equal("Prem Ramanathan", dataStoreObject["user.fieryorc"].name);
+                verifyUser("fieryorc", "Prem Ramanathan");
                 done();
             })
             .catch(err => done(err));
@@ -90,7 +111,7 @@ describe('basic-tests', function () {
         var user = new UserEntity();
         user.setContext(context);
         user.id = "fieryorc";
-        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc", name: "Prem Ramanathan" };
+        addUser("fieryorc", "Prem Ramanathan");
 
         user.delete()
             .then(() => {
@@ -122,7 +143,7 @@ describe('basic-tests', function () {
         var user = new UserEntity();
         user.setContext(context);
         user.id = "fieryorc";
-        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc", name: "Prem Ramanathan" };
+        addUser("fieryorc", "Prem Ramanathan");
 
         user.load()
             .then((loaded) => {
@@ -146,8 +167,8 @@ describe('basic-tests', function () {
         user.name = "Prem Ramanathan";
         user.save()
             .then(() => {
-                should.equal("fieryorc", dataStoreObject["user.fieryorc"].id);
-                dataStoreObject["user.fieryorc"].name = "Prem (modified) Ramanathan";
+                verifyUser("fieryorc", "Prem Ramanathan");
+                dataStoreObject["user.fieryorc"].data.name = "Prem (modified) Ramanathan";
                 return user.refresh();
             })
             .then(() => {
@@ -161,7 +182,8 @@ describe('basic-tests', function () {
         var user = new UserEntity();
         user.setContext(context);
         user.id = "fieryorc";
-        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc", name: "Prem Ramanathan" };
+        addUser("fieryorc", "Prem Ramanathan");
+
         user.load()
             .then(isLoaded => {
                 if (!isLoaded) {
@@ -186,7 +208,7 @@ describe('basic-tests', function () {
         user.setContext(context);
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
-        dataStoreObject["user.fieryorc"] = { kind: "user", id: "fieryorc" };
+        addUser("fieryorc", "Prem Ramanathan");
         user.insert()
             .then((v) => {
                 should.equal(false, v, "Insert should not succeed when there is a conflict.");
@@ -206,26 +228,22 @@ describe('basic-tests', function () {
     });
 
     function createUsers(): void {
-        dataStoreObject["user.fieryorc"] = {
-            kind: "user",
-            id: "fieryorc",
-            name: "Prem Ramanathan"
-        };
-        dataStoreObject["user.superman"] = {
-            kind: "user",
-            id: "superman",
-            name: "Super Man"
-        };
+        addUser("fieryorc", "Prem Ramanathan");
+        addUser("superman", "Super Man");
     }
 
     function createBugInDataStore(): void {
         dataStoreObject["bug.123"] = {
-            kind: "bug",
-            id: "123",
-            assignedTo: "superman",
-            createdBy: "fieryorc",
-            state: BugStates.ASSIGNED
-        }
+            key: {
+                kind: "bug",
+                id: "123",
+            },
+            data: {
+                assignedTo: "superman",
+                createdBy: "fieryorc",
+                state: BugStates.ASSIGNED
+            }
+        };
     }
 
     it("reference-save", function (done) {
@@ -247,7 +265,9 @@ describe('basic-tests', function () {
                 should.equal(EntityState.NOT_LOADED, bug.createdBy.getState());
                 should.equal(EntityState.NOT_LOADED, bug.assignedTo.getState());
                 should.exist(dataStoreObject["bug.123"]);
-                should.equal(BugStates.ASSIGNED, dataStoreObject["bug.123"].state);
+                should.equal(BugStates.ASSIGNED, dataStoreObject["bug.123"].data.state);
+                should.equal("superman", dataStoreObject["bug.123"].data.assignedTo);
+                should.equal("fieryorc", dataStoreObject["bug.123"].data.createdBy);
                 should.not.exist(dataStoreObject["user.superman"]);
                 should.not.exist(dataStoreObject["user.fieryorc"]);
                 done();

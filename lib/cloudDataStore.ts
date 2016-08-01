@@ -89,12 +89,33 @@ export class CloudDataStore implements IDataStore {
             key: this.getPrimaryKeyValue<string>(cEntity),
             stringValue: null
         };
-        key.stringValue = JSON.stringify(key);
+        key.stringValue = CloudDataStore.getKeyStringValue(key);
         return key;
     }
 
     public getData(entity: StorageEntity): IEntityData {
-        return EntityHelpers.getObject(entity, true, true, ["kind"]);
+        var data = EntityHelpers.getObject(entity, true, true, ["kind", entity.getPrimaryKeys()[0].name]);
+        var key = this.getKey(entity);
+        return {
+            key: key,
+            data: data
+        };
+    }
+
+    public write(entity: StorageEntity, data: IEntityData): void {
+        var cEntity = <CloudStoreEntity>entity;
+        var key: ICloudEntityKey = <ICloudEntityKey>data.key;
+        if (key.kind !== cEntity.kind) {
+            throw `CloudDataStore.write(): Invalid entity kind. Expected: ${key.kind}, Actual: ${cEntity.kind}`;
+        }
+        var primaryKeyName = entity.getPrimaryKeys()[0].name;
+        var primaryKeyValue = cEntity.getPropertyValue<string>(primaryKeyName);
+        if (primaryKeyValue && primaryKeyValue !== key.key) {
+            throw `CloudDataStore.write(): Trying to update primary key from '${primaryKeyValue}' to '${key.key}'`;
+        }
+
+        entity.setPropertyValue<string>(primaryKeyName, key.key);
+        EntityHelpers.loadObject(entity, data.data);
     }
 
     public del(key: IEntityKey): Promise<void> {
@@ -112,9 +133,7 @@ export class CloudDataStore implements IDataStore {
         var getPromise = Promise.promisify(this.store.get, { context: this.store });
         var storeKey = this.store.key([cKey.kind, cKey.key]);
         return getPromise(storeKey)
-            .then((v: any) => {
-                return v && v.data;
-            })
+            .then(gData => CloudDataStore.convertData(gData))
             .catch(err => {
                 throw this.convertError(err);
             });;
@@ -133,21 +152,17 @@ export class CloudDataStore implements IDataStore {
         var storeQuery = this.store.createQuery(cq._kind);
         cq._filters.forEach((f: IFilter) => {
             if (f.operator) {
-                storeQuery = storeQuery.filter(f.property, f.value);
-            } else {
                 storeQuery = storeQuery.filter(f.property, f.operator, f.value);
+            } else {
+                storeQuery = storeQuery.filter(f.property, f.value);
             }
         });
         var queryPromise = Promise.promisify(this.store.runQuery, { context: this.store });
         return <any>queryPromise(storeQuery)
             .then((result: any[]) => {
                 var entities: any[] = [];
-                result.forEach(e => {
-                    entities.push(e.data);
-                });
-                this.store.runInTransaction((tn, done) => {
-
-                }, (err) => {
+                result.forEach(gData => {
+                    entities.push(CloudDataStore.convertData(gData));
                 });
                 return entities;
             });
@@ -179,5 +194,31 @@ export class CloudDataStore implements IDataStore {
     private getPrimaryKeyValue<T>(entity: StorageEntity): T {
         var propName = entity.getPrimaryKeys()[0].name;
         return <T>entity.getPropertyValue(propName);
+    }
+
+    private static getKeyStringValue(key: ICloudEntityKey) {
+        return key.kind + "." + key.key;
+    }
+
+    /**
+     * Converts the data received from google api to IEntityData.
+     */
+    private static convertData(gData: any): IEntityData {
+        if (!gData || !gData.data || !gData.key) {
+            return null;
+        }
+
+        var key: ICloudEntityKey = {
+            kind: gData.key.kind,
+            key: gData.key.id || gData.key.name,
+            stringValue: null
+        };
+
+        key.stringValue = CloudDataStore.getKeyStringValue(key);
+        var data: IEntityData = {
+            key: key,
+            data: gData.data
+        };
+        return data;
     }
 }

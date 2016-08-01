@@ -61,16 +61,17 @@ class DataContext implements IDataContextExtended {
      */
     public query<T extends StorageEntity>(type: { new (): T }, query: IQueryBuilder): Promise<T[]> {
         return this._store.query(query)
-            .then((data: any[]) => {
+            .then((data) => {
                 var results: T[] = [];
                 if (data) {
                     data.forEach(d => {
                         var e = new type();
                         e.setContext(this);
-                        EntityHelpers.loadObject(e, d);
+                        this._store.write(e, d);
                         results.push(e);
                     });
                 }
+
                 return results;
             });
     }
@@ -119,6 +120,10 @@ class DataContext implements IDataContextExtended {
 
     public _data(entity: StorageEntity): IEntityData {
         return this._store.getData(entity);
+    }
+
+    public _write(entity: StorageEntity, data: IEntityData): void {
+        this._store.write(entity, data);
     }
 
     public _add(entity: StorageEntity): void {
@@ -187,6 +192,6 @@ class DataContext implements IDataContextExtended {
  *        If nonzero value, then datacontext will keep the data for the specified
  *        time.
  */
-export function createDataContext(store: IDataStore, cacheTimeout?: number) : IDataContext {
-    return new DataContext(store, cacheTimeout ? new TimedCache(cacheTimeout) : null);
+export function createDataContext(store: IDataStore, cacheTimeout?: number): IDataContext {
+    return new DataContext(store, cacheTimeout ? new TimedCache<string, IEntityData>(cacheTimeout) : null);
 }

@@ -56,7 +56,7 @@ class EmployeeEntity extends CloudStoreEntity {
 // entityjs comes with two data stores. InMemoryDataStore and CloudDataStore.
 // You need to set context for entities to use functions that interact with the store (load, save, etc).
 
-var context = new DataContext(new InMemoryDataStore({}, /* disable_cache */ true }));
+var context = new DataContext(new InMemoryDataStore({}}));
 ```
 
 ## Adding new entity to DB
