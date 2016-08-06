@@ -77,12 +77,12 @@ export interface IDataStore {
     /**
      * Insert entity into the store.
      */
-    insert(key: IEntityKey, data: IEntityData): Promise<boolean>;
+    insert(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
 
     /**
      * Save the entity into the store.
      */
-    save(key: IEntityKey, data: IEntityData): Promise<void>;
+    save(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
 
     /**
      * Query for entities.
@@ -160,12 +160,12 @@ export interface IDataContextExtended extends IDataContext {
     /**
      * Insert entity into the store.
      */
-    _insert(key: IEntityKey, data: IEntityData): Promise<boolean>;
+    _insert(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
 
     /**
      * Save the entity into the store.
      */
-    _save(key: IEntityKey, data: IEntityData): Promise<void>;
+    _save(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
 
 }
 
@@ -175,7 +175,7 @@ export interface IStorageEntityPrivate extends IEntityPrivate {
     loadingPromise: Promise<boolean>;
     deletingPromise: Promise<void>;
     savePromise: Promise<void>;
-    insertPromise: Promise<boolean>;
+    insertPromise: Promise<void>;
     error: any;
     context: IDataContextExtended;
 }
@@ -294,6 +294,7 @@ export abstract class StorageEntity extends Entity {
                 this.setState(EntityState.NOT_LOADED);
                 this.getPrivate().loadingPromise = null;
                 this.getPrivate().error = err;
+                // TODO: Ensure always consistent error message.
                 throw err;
             });;
 
@@ -381,20 +382,18 @@ export abstract class StorageEntity extends Entity {
      * If already exists, will return false.
      * Promise will fail when there are other errors.
      */
-    public insert(): Promise<boolean> {
+    public insert(): Promise<void> {
         if (this.getPrivate().insertPromise) {
             return this.getPrivate().insertPromise;
         }
 
         if (this.getPrivate().savePromise) {
             Promise.reject("Can't insert entity. Save in progress.");
-            return;
         }
 
         var promise = this._save(/* overwrite */ false)
             .then((v) => {
                 this.getPrivate().insertPromise = null;
-                return v;
             })
             .catch((err) => {
                 this.getPrivate().insertPromise = null;
@@ -405,7 +404,7 @@ export abstract class StorageEntity extends Entity {
         return promise;
     }
 
-    private _save(overwrite: boolean): Promise<boolean> {
+    private _save(overwrite: boolean): Promise<void> {
         if (this.getState() === EntityState.LOADED ||
             this.getState() === EntityState.NOT_LOADED) {
             // We are good.
@@ -414,12 +413,12 @@ export abstract class StorageEntity extends Entity {
         }
         var key = this.getDataContext()._key(this);
         var data = this.getDataContext()._data(this);
-        var promise = overwrite ? <Promise<boolean>><any>this.getDataContext()._save(key, data) : this.getDataContext()._insert(key, data);
+        var promise = overwrite ? this.getDataContext()._save(key, data) : this.getDataContext()._insert(key, data);
         return promise
-            .then((succeeded) => {
+            .then((v: IEntityData) => {
+                this.getDataContext()._write(this, v);
                 this.setState(EntityState.LOADED);
                 this.resetState();
-                return succeeded;
             })
             .catch(err => {
                 this.getPrivate().error = err;

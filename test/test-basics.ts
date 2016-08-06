@@ -209,12 +209,15 @@ describe('basic-tests', function () {
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
         addUser("fieryorc", "Prem Ramanathan");
+        var insertFailed = false;
         user.insert()
-            .then((v) => {
-                should.equal(false, v, "Insert should not succeed when there is a conflict.");
+            .catch(err => {
+                insertFailed = true;
             })
             .then(() => {
-                // console.log("Insert failed. Trying save... ");
+                if (!insertFailed) {
+                    throw "Insert should have failed.";
+                }
                 return user.save();
             })
             .then(() => {

@@ -94,7 +94,7 @@ export class CloudDataStore implements IDataStore {
     }
 
     public getData(entity: StorageEntity): IEntityData {
-        var data = EntityHelpers.getObject(entity, true, true, ["kind", entity.getPrimaryKeys()[0].name]);
+        var data = EntityHelpers.getObject(entity, false, true, ["kind", entity.getPrimaryKeys()[0].name]);
         var key = this.getKey(entity);
         return {
             key: key,
@@ -115,7 +115,9 @@ export class CloudDataStore implements IDataStore {
         }
 
         entity.setPropertyValue<string>(primaryKeyName, key.key);
-        EntityHelpers.loadObject(entity, data.data);
+        if (data.data) {
+            EntityHelpers.loadObject(entity, data.data);
+        }
     }
 
     public del(key: IEntityKey): Promise<void> {
@@ -139,12 +141,12 @@ export class CloudDataStore implements IDataStore {
             });;
     }
 
-    public insert(key: IEntityKey, data: IEntityData): Promise<boolean> {
+    public insert(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
         return this.doInsert(<ICloudEntityKey>key, data, false);
     }
 
-    public save(key: IEntityKey, data: IEntityData): Promise<void> {
-        return this.doInsert(<ICloudEntityKey>key, data, true).then(v => null);
+    public save(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
+        return this.doInsert(<ICloudEntityKey>key, data, true)
     }
 
     public query<T>(builder: IQueryBuilder): Promise<IEntityData[]> {
@@ -168,7 +170,7 @@ export class CloudDataStore implements IDataStore {
             });
     }
 
-    private doInsert(key: ICloudEntityKey, data: IEntityData, overwrite: boolean): Promise<boolean> {
+    private doInsert(key: ICloudEntityKey, data: IEntityData, overwrite: boolean): Promise<IEntityData> {
         var id = key.key;
         var storeKey = this.store.key(id ? [key.kind, id] : key.kind);
         var keyStr = JSON.stringify(key);
@@ -176,7 +178,19 @@ export class CloudDataStore implements IDataStore {
             { context: this.store });
         // TODO: Check return values.
         return <any>insertPromise({ key: storeKey, data: data })
-            .catch(err => { throw this.convertError(err); });;
+            .then(v => {
+                var savedKey = <ICloudEntityKey>{
+                    key: (<any>v).mutationResults[0].key.path[0].id,
+                    kind: (<any>v).mutationResults[0].key.path[0].kind,
+                    stringValue: null
+                };
+                savedKey.stringValue = CloudDataStore.getKeyStringValue(savedKey);
+                return {
+                    key: savedKey,
+                    data: null
+                };
+            })
+            .catch(err => { throw this.convertError(err); });
     }
 
     private convertError(err: any): CommonTypes.PromiseError {

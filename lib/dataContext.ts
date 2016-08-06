@@ -165,9 +165,9 @@ class DataContext implements IDataContextExtended {
             });
     }
 
-    public _insert(key: IEntityKey, data: IEntityData): Promise<boolean> {
+    public _insert(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
         return this._store.insert(key, data)
-            .then((v) => {
+            .then((v: IEntityData) => {
                 if (this._dataCache && v) {
                     this._dataCache.set(key.stringValue, data);
                 }
@@ -175,12 +175,13 @@ class DataContext implements IDataContextExtended {
             });
     }
 
-    public _save(key: IEntityKey, data: IEntityData): Promise<void> {
+    public _save(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
         return this._store.save(key, data)
-            .then(() => {
+            .then((v) => {
                 if (this._dataCache) {
                     this._dataCache.set(key.stringValue, data);
                 }
+                return v;
             });
     }
 }

@@ -98,8 +98,7 @@ describe('caching-tests', function() {
         user.name = "Prem Ramanathan";
         var user2: UserEntity;
         user.insert()
-            .then((isLoaded) => {
-                should.equal(true, isLoaded);
+            .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
                 verifyUser("fieryorc", "Prem Ramanathan");
@@ -110,8 +109,7 @@ describe('caching-tests', function() {
                 user2.id = "fieryorc";
                 return user2.load();
             })
-            .then((isLoaded) => {
-                should.equal(true, isLoaded);
+            .then(() => {
                 should.equal(EntityState.LOADED, user2.getState());
                 should.equal(false, user2.getChanged());
                 should.equal("fieryorc", user2.id);

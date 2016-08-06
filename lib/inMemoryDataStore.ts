@@ -87,13 +87,11 @@ export class InMemoryDataStore implements IDataStore {
         return Promise.resolve(this.db[key.stringValue]);
     }
 
-    public insert(key: IEntityKey, data: IEntityData): Promise<boolean> {
-        return this.doInsert(key, data, false)
-            .then(() => true)
-            .catch(err => false);
+    public insert(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
+        return this.doInsert(key, data, false);
     }
 
-    public save(key: IEntityKey, data: IEntityData): Promise<void> {
+    public save(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
         return this.doInsert(key, data, true);
     }
 
@@ -103,15 +101,18 @@ export class InMemoryDataStore implements IDataStore {
         });
     }
 
-    private doInsert(key: IEntityKey, data: IEntityData, overwrite: boolean): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
+    private doInsert(key: IEntityKey, data: IEntityData, overwrite: boolean): Promise<IEntityData> {
+        return new Promise<IEntityData>((resolve, reject) => {
             if (!overwrite && (key.stringValue in this.db)) {
                 reject(`Entity key(${key})already exists.`);
                 return;
             }
 
             this.db[key.stringValue] = data;
-            resolve();
+            resolve({
+                key: key,
+                data: null
+            });
         });
     }
 }
