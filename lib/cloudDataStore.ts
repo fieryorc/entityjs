@@ -27,9 +27,20 @@ interface ICloudEntityKey extends IEntityKey {
     key: string;
 }
 
+interface ICloudEntityData extends IEntityData {
+    key: ICloudEntityKey;
+    data: IEntityData;
+}
+
 interface ICloudQueryBuilder extends IQueryBuilder {
     _kind: string;
     _filters: IFilter[];
+}
+
+interface ICloudTransaction {
+    transaction: GCloud.Datastore.ITransaction;
+    done: () => void;
+    promise: Promise<void>;
 }
 
 export class CloudDataStoreQueryBuilder implements IQueryBuilder {
@@ -65,6 +76,7 @@ export class CloudDataStoreQueryBuilder implements IQueryBuilder {
  */
 export class CloudDataStore implements IDataStore {
     private store: GCloud.Datastore.IDatastore;
+    private transaction: ICloudTransaction;
 
     public constructor(projectId: string) {
         this.store = gcloud.datastore({ projectId: projectId });
@@ -170,7 +182,38 @@ export class CloudDataStore implements IDataStore {
             });
     }
 
-    private doInsert(key: ICloudEntityKey, data: IEntityData, overwrite: boolean): Promise<IEntityData> {
+    public beginTransaction(): Promise<void> {
+        this.transaction = <ICloudTransaction>{};
+        return new Promise<void>((resolve, reject) => {
+            var transactionPromise = Promise.promisify(this.store.runInTransaction, { context: this.store });
+            this.transaction.promise = transactionPromise(
+                (tx, done) => {
+                    this.transaction.transaction = tx;
+                    this.transaction.done = done;
+                    resolve();
+                })
+                .then(() => {
+                    // We are here because it completed successfully.
+                    this.transaction = null;
+                })
+                .catch(err => {
+                    this.transaction = null;
+                    throw this.convertError(err);
+                });
+        });
+    }
+
+    public rollbackTransaction(): Promise<void> {
+        this.transaction.transaction.rollback(this.transaction.done);
+        return Promise.resolve();
+    }
+
+    public commitTransaction(): Promise<void> {
+        this.transaction.done();
+        return this.transaction.promise;
+    }
+
+    private doInsert(key: ICloudEntityKey, data: IEntityData, overwrite: boolean): Promise<ICloudEntityData> {
         var id = key.key;
         var storeKey = this.store.key(id ? [key.kind, id] : key.kind);
         var keyStr = JSON.stringify(key);
@@ -179,9 +222,13 @@ export class CloudDataStore implements IDataStore {
         // TODO: Check return values.
         return <any>insertPromise({ key: storeKey, data: data })
             .then(v => {
+                if (!v) {
+                    return null;
+                }
+                
                 var savedKey = <ICloudEntityKey>{
-                    key: (<any>v).mutationResults[0].key.path[0].id,
-                    kind: (<any>v).mutationResults[0].key.path[0].kind,
+                    key: storeKey.id || storeKey.name,
+                    kind: storeKey.kind,
                     stringValue: null
                 };
                 savedKey.stringValue = CloudDataStore.getKeyStringValue(savedKey);
@@ -190,7 +237,9 @@ export class CloudDataStore implements IDataStore {
                     data: null
                 };
             })
-            .catch(err => { throw this.convertError(err); });
+            .catch(err => {
+                throw this.convertError(err);
+            });
     }
 
     private convertError(err: any): CommonTypes.PromiseError {

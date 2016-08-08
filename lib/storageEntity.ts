@@ -5,6 +5,7 @@ import { Entity,
     PropertyDescriptor,
     EntityProperty } from "./entity";
 import * as Promise from "bluebird";
+import * as http_status_codes from "http-status-codes";
 
 export enum EntityState {
     /** Not loaded. New entities starts with this state. */
@@ -88,11 +89,28 @@ export interface IDataStore {
      * Query for entities.
      */
     query<T>(query: IQueryBuilder): Promise<IEntityData[]>;
+
+    /**
+     * Starts transaction.
+     */
+    beginTransaction(): Promise<void>;
+
+    /**
+     * Rollback transaction.
+     */
+    rollbackTransaction(): Promise<void>;
+
+    /**
+     * End transaction.
+     */
+    commitTransaction(): Promise<void>;
+
 }
 
 /**
  * Interface that provides the context for entities.
  * Every entity needs a datacontext to interact with the store.
+ * This is the userfacing interface that end users use to interact.
  */
 export interface IDataContext {
     /**
@@ -114,10 +132,31 @@ export interface IDataContext {
      * Save the given entities. If entities is null, all entities in the context will be saved.
      */
     save(entities: StorageEntity[]): Promise<void[]>;
+
+    /**
+     * Checks if the entity is part of the context.
+     */
+    has(entity: StorageEntity): boolean;
+
+    /**
+     * Starts transaction.
+     */
+    beginTransaction(): Promise<void>;
+
+    /**
+     * Rollback transaction.
+     */
+    rollbackTransaction(): Promise<void>;
+
+    /**
+     * End transaction.
+     */
+    commitTransaction(): Promise<void>;
 }
 
 /**
- * Interface that must be implemented by DataContext.
+ * Interface that must be implemented by DataContext. This is the low level
+ * interface that is used by entities.
  */
 export interface IDataContextExtended extends IDataContext {
 
@@ -166,7 +205,6 @@ export interface IDataContextExtended extends IDataContext {
      * Save the entity into the store.
      */
     _save(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
-
 }
 
 export interface IStorageEntityPrivate extends IEntityPrivate {
@@ -175,7 +213,7 @@ export interface IStorageEntityPrivate extends IEntityPrivate {
     loadingPromise: Promise<boolean>;
     deletingPromise: Promise<void>;
     savePromise: Promise<void>;
-    insertPromise: Promise<void>;
+    insertPromise: Promise<boolean>;
     error: any;
     context: IDataContextExtended;
 }
@@ -272,7 +310,7 @@ export abstract class StorageEntity extends Entity {
             }
         } else {
             // Invalid states.
-            throw `Can't load(). Entity is in invalid state: ${EntityState[this.getState()]}.`;
+           return Promise.reject(`Can't load(). Entity is in invalid state: ${EntityState[this.getState()]}.`);
         }
 
         this.getPrivate().loadingPromise = null;
@@ -330,7 +368,7 @@ export abstract class StorageEntity extends Entity {
         } else if (!(this.getState() == EntityState.NOT_LOADED ||
             this.getState() == EntityState.LOADED)) {
 
-            throw `Can't delete entity. Invalid state ${EntityState[this.getState()]}`;
+            return Promise.reject(`Can't delete entity. Invalid state ${EntityState[this.getState()]}`);
         }
 
         var currentState = this.getState();
@@ -357,8 +395,7 @@ export abstract class StorageEntity extends Entity {
      */
     public save(): Promise<void> {
         if (this.getPrivate().insertPromise) {
-            Promise.reject("Can't save entity. insert() already in progress.");
-            return;
+            return Promise.reject("Can't save entity. insert() already in progress.");
         }
 
         if (this.getPrivate().savePromise) {
@@ -382,18 +419,19 @@ export abstract class StorageEntity extends Entity {
      * If already exists, will return false.
      * Promise will fail when there are other errors.
      */
-    public insert(): Promise<void> {
+    public insert(): Promise<boolean> {
         if (this.getPrivate().insertPromise) {
             return this.getPrivate().insertPromise;
         }
 
         if (this.getPrivate().savePromise) {
-            Promise.reject("Can't insert entity. Save in progress.");
+            return Promise.reject("Can't insert entity. Save in progress.");
         }
 
         var promise = this._save(/* overwrite */ false)
             .then((v) => {
                 this.getPrivate().insertPromise = null;
+                return v;
             })
             .catch((err) => {
                 this.getPrivate().insertPromise = null;
@@ -404,25 +442,27 @@ export abstract class StorageEntity extends Entity {
         return promise;
     }
 
-    private _save(overwrite: boolean): Promise<void> {
+    private _save(overwrite: boolean): Promise<boolean> {
         if (this.getState() === EntityState.LOADED ||
             this.getState() === EntityState.NOT_LOADED) {
             // We are good.
         } else {
-            throw `Can't save entity: Invalid state: ${EntityState[this.getState()]}.`;
+            return Promise.reject(`Can't save entity: Invalid state: ${EntityState[this.getState()]}.`);
         }
+        
         var key = this.getDataContext()._key(this);
         var data = this.getDataContext()._data(this);
         var promise = overwrite ? this.getDataContext()._save(key, data) : this.getDataContext()._insert(key, data);
         return promise
             .then((v: IEntityData) => {
+                if (!v) {
+                    return false;
+                }
+
                 this.getDataContext()._write(this, v);
                 this.setState(EntityState.LOADED);
                 this.resetState();
-            })
-            .catch(err => {
-                this.getPrivate().error = err;
-                throw err;
+                return true;
             });
     }
 }

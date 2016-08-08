@@ -20,6 +20,9 @@ import { EntityHelpers } from "./entityHelpers";
  */
 export class InMemoryDataStore implements IDataStore {
     private db: CommonTypes.IDictionary<any>;
+    // backup copy for rolling back transaction.
+    private backup: string;
+
     public constructor(obj?: CommonTypes.IDictionary<any>) {
         this.db = obj || {};
     }
@@ -68,7 +71,7 @@ export class InMemoryDataStore implements IDataStore {
                 entity.setPropertyValue(p, (<any>key)[p]);
             }
         }
-        
+
         EntityHelpers.loadObject(entity, data.data);
     }
 
@@ -101,14 +104,40 @@ export class InMemoryDataStore implements IDataStore {
         });
     }
 
+    public beginTransaction(): Promise<void> {
+        this.backup = JSON.stringify(this.db);
+        return Promise.resolve();
+    }
+
+    public rollbackTransaction(): Promise<void> {
+        if (backupData) {
+            return Promise.reject("rollbackTransaction(): Can't rollback when not inside transaction.");
+        }
+
+        var backupData = JSON.parse(this.backup);
+        for (var key in this.db) {
+            delete this.db[key];
+        }
+        for (var key in backupData) {
+            this.db[key] = backupData[key];
+        }
+        return Promise.resolve();
+    }
+
+    public commitTransaction(): Promise<void> {
+        this.backup = null;
+        return Promise.resolve();
+    }
+
     private doInsert(key: IEntityKey, data: IEntityData, overwrite: boolean): Promise<IEntityData> {
         return new Promise<IEntityData>((resolve, reject) => {
             if (!overwrite && (key.stringValue in this.db)) {
-                reject(`Entity key(${key})already exists.`);
+                resolve(null);
                 return;
             }
 
-            this.db[key.stringValue] = data;
+            // Normalize the data (strip out any functions, other misc stufff) before storing.
+            this.db[key.stringValue] = JSON.parse(JSON.stringify(data));
             resolve({
                 key: key,
                 data: null

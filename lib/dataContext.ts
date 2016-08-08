@@ -103,11 +103,20 @@ class DataContext implements IDataContextExtended {
         return Promise.all(promises);
     }
 
-    /**
-     * Checks if the entity is part of the context.
-     */
     public has(entity: StorageEntity): boolean {
         return this._entityMap.has(entity);
+    }
+
+    public beginTransaction(): Promise<void> {
+        return this.store.beginTransaction();
+    }
+
+    public rollbackTransaction(): Promise<void> {
+        return this.store.rollbackTransaction();
+    }
+
+    public commitTransaction(): Promise<void> {
+        return this.store.commitTransaction();
     }
 
     ////////////////////////////////////////////////////////////////

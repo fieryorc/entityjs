@@ -18,119 +18,136 @@ import {
     BugEntity,
     BugStates
 } from "./testEntities";
+import { ITestContext, TestInMemoryContext, TestCloudStoreContext } from "./test-context";
 
 var should = chai.should();
 chai.use(chaiHttp);
+var useInMemoryStore: boolean = true;
 
-var dataStoreObject: any;
-var context: IDataContext;
-var dataStore: IDataStore;
+var context: ITestContext;
 
 describe('basic-tests', function () {
 
     beforeEach(() => {
-        dataStoreObject = {};
-        dataStore = new InMemoryDataStore(dataStoreObject);
-        context = createDataContext(dataStore);
+        context = useInMemoryStore ? new TestInMemoryContext() : new TestCloudStoreContext("qfeedbackme");
+        return context.clean(UserEntity.KIND)
+            .then(() => context.clean(BugEntity.KIND));
     });
 
     afterEach(() => {
         // console.log(`Datastore = ${JSON.stringify(dataStoreObject)}`);
     });
 
-    function addUser(id: string, name: string) {
-        var stringValue = "user." + id;
-        dataStoreObject[stringValue] = {
-            key: {
-                kind: "user",
-                id: id,
-                stringValue: stringValue
-            },
-            data: {
-                name: name
-            }
-        };
+    function addUser(id: string, name: string): Promise<void> {
+        return context.ensureEntity(UserEntity.KIND, id, { name: name });
     }
 
-    function verifyUser(id: string, name: string) {
-        var stringValue = "user." + id;
-        should.equal(id, dataStoreObject[stringValue].key.id);
-        should.equal("user", dataStoreObject[stringValue].key.kind);
-        should.equal(stringValue, dataStoreObject[stringValue].key.stringValue);
-        should.equal(name, dataStoreObject[stringValue].data.name);
+    function verifyUser(id: string, name: string): Promise<void> {
+        return context
+            .getEntity(UserEntity.KIND, id)
+            .then((data) => {
+                should.exist(data);
+                should.equal(name, data.name);
+            });
     }
 
-    it("save-simple", function (done) {
+    function verifyUserDeleted(id: string) {
+        return context
+            .getEntity(UserEntity.KIND, id)
+            .then((data) => {
+                should.not.exist(data);
+            });
+    }
+
+    function updateUser(id: string, name: string) {
+        return context
+            .getEntity(UserEntity.KIND, id)
+            .then(() => {
+                return context.updateEntity(UserEntity.KIND, id, { name: name });
+            });
+    }
+
+    function addBug(id: string, state: string, assignedTo: string, createdBy: string): Promise<void> {
+        return context
+            .ensureEntity(BugEntity.KIND, id, {
+                state: state,
+                assignedTo: assignedTo,
+                createdBy: createdBy
+            });
+    }
+
+    function verifyBug(id: string, state: string, assignedTo: string, createdBy: string): Promise<void> {
+        return context
+            .getEntity(BugEntity.KIND, id)
+            .then((data) => {
+                should.exist(data);
+                should.equal(state, data.state);
+                should.equal(assignedTo, data.assignedTo);
+                should.equal(createdBy, data.createdBy);
+            });
+    }
+
+    it("save-simple", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
-        user.save()
+        return user.save()
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                verifyUser("fieryorc", "Prem Ramanathan");
-                done();
-            })
-            .catch(err => done(err));
+                return verifyUser("fieryorc", "Prem Ramanathan");
+            });
     });
 
-    it("load-simple", function (done) {
+    it("load-simple", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
-
-        user.load()
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.load())
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
                 should.equal("fieryorc", user.id);
                 should.equal("Prem Ramanathan", user.name);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
-    it("insert-simple", function (done) {
+    it("insert-simple", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
-        user.insert()
+        return user.insert()
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                verifyUser("fieryorc", "Prem Ramanathan");
-                done();
+                return verifyUser("fieryorc", "Prem Ramanathan");
             })
-            .catch(err => done(err));
     });
 
-    it("delete-simple", function (done) {
+    it("delete-simple", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
-
-        user.delete()
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.delete())
             .then(() => {
                 should.equal(EntityState.DELETED, user.getState());
                 should.equal(false, user.getChanged());
-                should.equal(undefined, dataStoreObject["user.fieryorc"]);
+                verifyUserDeleted("user.fieryorc");
             })
-            .catch(err => done(err))
             .then(() => {
-                return user.save();
-            })
-            .then(() => true)
-            .catch(err => false)
-            .then(succeeded => succeeded ? done("save() should not succeed after delete.") : done());
+                return user.save().catch(err => {
+                    should.exist(err);
+                });
+            });
     });
 
     it("delete-error", function (done) {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
         user.delete()
             .then(() => {
@@ -139,13 +156,12 @@ describe('basic-tests', function () {
             .catch(err => done());
     });
 
-    it("delete-loaded-entity", function (done) {
+    it("delete-loaded-entity", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
-
-        user.load()
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.load())
             .then((loaded) => {
                 should.equal(true, loaded);
                 should.equal(EntityState.LOADED, user.getState());
@@ -154,42 +170,34 @@ describe('basic-tests', function () {
             })
             .then(() => {
                 should.equal(EntityState.DELETED, user.getState());
-                should.equal(undefined, dataStoreObject["user.fieryorc"]);
-                done();
+                return verifyUserDeleted("user.fieryorc");
             })
-            .catch(err => done(err));
     });
 
-    it("refresh-simple", function (done) {
+    it("refresh-simple", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
-        user.save()
+        return user.save()
             .then(() => {
                 verifyUser("fieryorc", "Prem Ramanathan");
-                dataStoreObject["user.fieryorc"].data.name = "Prem (modified) Ramanathan";
-                return user.refresh();
+                return updateUser("fieryorc", "Prem (modified) Ramanathan");
             })
+            .then(() => user.refresh())
             .then(() => {
                 should.equal("Prem (modified) Ramanathan", user.name);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
-    it("change-tracking", function (done) {
+    it("change-tracking", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
-
-        user.load()
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.load())
             .then(isLoaded => {
-                if (!isLoaded) {
-                    done("Load failed.");
-                    return;
-                }
+                should.equal(true, isLoaded);
                 should.equal(false, user.getChanged());
                 should.equal("Prem Ramanathan", user.name);
                 user.name = "Prem Ramanathan2";
@@ -198,100 +206,67 @@ describe('basic-tests', function () {
             })
             .then(() => {
                 should.equal(false, user.getChanged());
-                done();
-            })
-            .catch(err => done(err));
-    });
-
-    it("insert-on-conflict", function (done) {
-        var user = new UserEntity();
-        user.setContext(context);
-        user.id = "fieryorc";
-        user.name = "Prem Ramanathan";
-        addUser("fieryorc", "Prem Ramanathan");
-        var insertFailed = false;
-        user.insert()
-            .catch(err => {
-                insertFailed = true;
-            })
-            .then(() => {
-                if (!insertFailed) {
-                    throw "Insert should have failed.";
-                }
-                return user.save();
-            })
-            .then(() => {
-                should.equal(EntityState.LOADED, user.getState());
-                //console.log(`Save succeeded.`);
-                done();
-            })
-            .catch(err => {
-                done(`Save failed. It should always succeed. error: ${err}`);
+                return verifyUser("fieryorc", "Prem Ramanathan2");
             });
     });
 
-    function createUsers(): void {
-        addUser("fieryorc", "Prem Ramanathan");
-        addUser("superman", "Super Man");
-    }
+    it("insert-on-conflict", function () {
+        var user = new UserEntity();
+        user.setContext(context.context);
+        user.id = "fieryorc";
+        user.name = "Prem Ramanathan";
 
-    function createBugInDataStore(): void {
-        dataStoreObject["bug.123"] = {
-            key: {
-                kind: "bug",
-                id: "123",
-            },
-            data: {
-                assignedTo: "superman",
-                createdBy: "fieryorc",
-                state: BugStates.ASSIGNED
-            }
-        };
-    }
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.insert())
+            .then(succeeded => {
+                should.equal(false, succeeded);
+            })
+            .then(() => user.save())
+            .then(() => {
+                should.equal(EntityState.LOADED, user.getState());
+            });
+    });
 
-    it("reference-save", function (done) {
+    it("reference-save", function () {
         var bug = new BugEntity();
-        bug.setContext(context);
+        bug.setContext(context.context);
         bug.id = "123";
         bug.state = BugStates.ASSIGNED;
         bug.assignedTo = new UserEntity();
-        bug.assignedTo.setContext(context);
+        bug.assignedTo.setContext(context.context);
         bug.assignedTo.id = "superman";
         bug.createdBy = new UserEntity();
-        bug.createdBy.setContext(context);
+        bug.createdBy.setContext(context.context);
         bug.createdBy.id = "fieryorc";
 
-        bug.save()
+        return bug
+            .save()
             .then(() => {
                 should.equal(EntityState.LOADED, bug.getState());
                 should.equal(false, bug.getChanged());
                 should.equal(EntityState.NOT_LOADED, bug.createdBy.getState());
                 should.equal(EntityState.NOT_LOADED, bug.assignedTo.getState());
-                should.exist(dataStoreObject["bug.123"]);
-                should.equal(BugStates.ASSIGNED, dataStoreObject["bug.123"].data.state);
-                should.equal("superman", dataStoreObject["bug.123"].data.assignedTo);
-                should.equal("fieryorc", dataStoreObject["bug.123"].data.createdBy);
-                should.not.exist(dataStoreObject["user.superman"]);
-                should.not.exist(dataStoreObject["user.fieryorc"]);
-                done();
-            })
-            .catch(err => done(err));
+                verifyBug("123", BugStates.ASSIGNED, "superman", "fieryorc");
+                verifyUserDeleted("superman");
+                verifyUserDeleted("fieryorc");
+            });
     });
 
-    it("reference-load", function (done) {
-        createBugInDataStore();
+    it("reference-load", function () {
         var bug = new BugEntity();
-        bug.setContext(context);
+        bug.setContext(context.context);
         bug.id = "123";
-        bug.load()
+
+        return addBug("123", BugStates.ASSIGNED, "superman", "fieryorc")
+            .then(() => addUser("superman", "Super Man"))
+            .then(() => addUser("fieryorc", "Prem Ramanathan"))
+            .then(() => bug.load())
             .then(() => {
                 should.equal(EntityState.LOADED, bug.getState());
                 should.equal(false, bug.getChanged());
                 should.equal(EntityState.NOT_LOADED, bug.createdBy.getState());
                 should.equal(EntityState.NOT_LOADED, bug.assignedTo.getState());
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
     // TODO: Validate referential integrity on save(). (Not supported.)

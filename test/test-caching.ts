@@ -18,94 +18,94 @@ import {
     BugEntity,
     BugStates
 } from "./testEntities";
+import { ITestContext, TestInMemoryContext, TestCloudStoreContext } from "./test-context";
 
 var should = chai.should();
 chai.use(chaiHttp);
+var useInMemoryStore: boolean = true;
 
-var dataStoreObject: any;
-var context: IDataContext;
-var dataStore: IDataStore;
+var context: ITestContext;
 
-describe('caching-tests', function() {
+describe('caching-tests', function () {
 
     beforeEach(() => {
-        dataStoreObject = {};
-        dataStore = new InMemoryDataStore(dataStoreObject);
-        context = createDataContext(dataStore, 10000);
+        return createContext(100000).then(c => {
+            context = c;
+        });
     });
 
     afterEach(() => {
         // console.log(`Datastore = ${JSON.stringify(dataStoreObject)}`);
     });
 
-    function addUser(id: string, name: string) {
-        var stringValue = "user." + id;
-        dataStoreObject[stringValue] = {
-            key: {
-                kind: "user",
-                id: id,
-                stringValue: stringValue
-            },
-            data: {
-                name: name
-            }
-        };
+    function createContext(cacheTimeout: number): Promise<ITestContext> {
+        var context = useInMemoryStore ? new TestInMemoryContext(cacheTimeout) : new TestCloudStoreContext("qfeedbackme", cacheTimeout);
+        return context.clean(UserEntity.KIND)
+            .then(() => context.clean(BugEntity.KIND))
+            .then(() => context);
     }
 
-    function verifyUser(id: string, name: string) {
-        var stringValue = "user." + id;
-        should.equal(id, dataStoreObject[stringValue].key.id);
-        should.equal("user", dataStoreObject[stringValue].key.kind);
-        should.equal(stringValue, dataStoreObject[stringValue].key.stringValue);
-        should.equal(name, dataStoreObject[stringValue].data.name);
+    function addUser(id: string, name: string): Promise<void> {
+        return context.ensureEntity(UserEntity.KIND, id, { name: name });
+    }
+
+    function verifyUser(id: string, name: string): Promise<void> {
+        return context
+            .getEntity(UserEntity.KIND, id)
+            .then((data) => {
+                should.exist(data);
+                should.equal(name, data.name);
+            });
     }
 
     // Check that cache is used for second attempt.
-    it("test-cache-simple", function(done) {
+    it("test-cache-simple", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
         var user2: UserEntity;
-        user.load()
+
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.load())
             .then((isLoaded) => {
                 should.equal(true, isLoaded);
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                verifyUser("fieryorc", "Prem Ramanathan");
+                return verifyUser("fieryorc", "Prem Ramanathan");
+            })
+            .then(() => {
                 user2 = new UserEntity();
-                user2.setContext(context);
+                user2.setContext(context.context);
                 user2.id = "fieryorc";
                 // Null out dataStore so access will fail if it tried to access.
-                delete dataStoreObject["user.fieryorc"];
-                return user2.load();
+                return context.ensureEntityDeleted(UserEntity.KIND, "fieryorc");
             })
+            .then(() => user2.load())
             .then((isLoaded) => {
                 should.equal(true, isLoaded);
                 should.equal(EntityState.LOADED, user2.getState());
                 should.equal(false, user2.getChanged());
                 should.equal("fieryorc", user2.id);
                 should.equal("Prem Ramanathan", user2.name);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
-    it("test-cache-insert", function(done) {
+    it("test-cache-insert", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
         var user2: UserEntity;
-        user.insert()
+        return user.insert()
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                verifyUser("fieryorc", "Prem Ramanathan");
-
-                delete dataStoreObject["user.fieryorc"];
+                return verifyUser("fieryorc", "Prem Ramanathan");
+            })
+            .then(() => context.ensureEntityDeleted(UserEntity.KIND, "fieryorc"))
+            .then(() => {
                 user2 = new UserEntity();
-                user2.setContext(context);
+                user2.setContext(context.context);
                 user2.id = "fieryorc";
                 return user2.load();
             })
@@ -114,25 +114,25 @@ describe('caching-tests', function() {
                 should.equal(false, user2.getChanged());
                 should.equal("fieryorc", user2.id);
                 should.equal("Prem Ramanathan", user2.name);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
-    it("test-cache-save", function(done) {
+    it("test-cache-save", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
         user.name = "Prem Ramanathan";
         var user2: UserEntity;
-        user.save()
+        return user.save()
             .then(() => {
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                verifyUser("fieryorc", "Prem Ramanathan");
-                delete dataStoreObject["user.fieryorc"];
+                return verifyUser("fieryorc", "Prem Ramanathan");
+            })
+            .then(() => context.ensureEntityDeleted(UserEntity.KIND, "fieryorc"))
+            .then(() => {
                 user2 = new UserEntity();
-                user2.setContext(context);
+                user2.setContext(context.context);
                 user2.id = "fieryorc";
                 return user2.load();
             })
@@ -142,26 +142,29 @@ describe('caching-tests', function() {
                 should.equal(false, user2.getChanged());
                 should.equal("fieryorc", user2.id);
                 should.equal("Prem Ramanathan", user2.name);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
     // Make sure cache is purged when entity is deleted.
-    it("test-cache-del", function(done) {
+    it("test-cache-del", function () {
         var user = new UserEntity();
-        user.setContext(context);
+        user.setContext(context.context);
         user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
         var user2: UserEntity;
-        user.delete()
+        return addUser("fieryorc", "Prem Ramanathan")
+            .then(() => user.delete())
             .then(() => {
                 should.equal(EntityState.DELETED, user.getState());
                 should.equal(false, user.getChanged());
-                should.equal(undefined, dataStoreObject["user.fieryorc"]);
-                addUser("fieryorc", "Prem Ramanathan");
+                return context.getEntity(UserEntity.KIND, "fieryorc");
+            })
+            .then((data) => {
+                should.not.exist(data);
+                return addUser("fieryorc", "Prem Ramanathan");
+            })
+            .then(() => {
                 user2 = new UserEntity();
-                user2.setContext(context);
+                user2.setContext(context.context);
                 user2.id = "fieryorc";
                 return user2.load();
             })
@@ -171,29 +174,30 @@ describe('caching-tests', function() {
                 should.equal(false, user2.getChanged());
                 should.equal("fieryorc", user2.id);
                 should.equal("Prem Ramanathan", user2.name);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
     // Make sure disabling cache works.
-    it("test-cache-disable", function(done) {
-        dataStoreObject = {};
-        dataStore = new InMemoryDataStore(dataStoreObject);
-        context = createDataContext(dataStore);
-
+    it("test-cache-disable", function () {
         var user = new UserEntity();
-        user.setContext(context);
-        user.id = "fieryorc";
-        addUser("fieryorc", "Prem Ramanathan");
-        var user2: UserEntity;
-        user.load()
-            .then(() => {
+        var user2 = new UserEntity();
+
+        return createContext(0)
+            .then((c) => {
+                context = c;
+                user.id = "fieryorc";
+                user.setContext(context.context);
+                return addUser("fieryorc", "Prem Ramanathan");
+            })
+            .then(() => user.load())
+            .then((isLoaded) => {
+                should.equal(true, isLoaded);
                 should.equal(EntityState.LOADED, user.getState());
                 should.equal(false, user.getChanged());
-                delete dataStoreObject["user.fieryorc"];
-                user2 = new UserEntity();
-                user2.setContext(context);
+            })
+            .then(() => context.ensureEntityDeleted(UserEntity.KIND, "fieryorc"))
+            .then(() => {
+                user2.setContext(context.context);
                 user2.id = "fieryorc";
                 user2.resetState();
                 return user2.load();
@@ -203,9 +207,7 @@ describe('caching-tests', function() {
                 should.equal(EntityState.NOT_LOADED, user2.getState());
                 should.equal(false, user2.getChanged());
                 should.equal("fieryorc", user2.id);
-                done();
-            })
-            .catch(err => done(err));
+            });
     });
 
 });

@@ -4,7 +4,7 @@ import { CloudStoreEntity, ValueProperty, ReferenceProperty, PrimaryKeyProperty,
 
 export class UserEntity extends CloudStoreEntity {
 
-    public static KIND = "user";
+    public static KIND = "TestUser";
 
     /**
      * This means the property is a primary key.
@@ -44,7 +44,7 @@ export class BugStates {
 }
 
 export class BugEntity extends CloudStoreEntity {
-    public static KIND = "bug";
+    public static KIND = "TestBug";
 
     /**
      * This means the property is a primary key.
