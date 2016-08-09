@@ -24,7 +24,7 @@ var should = chai.should();
 chai.use(chaiHttp);
 
 var context: IDataContext;
-var dataStore: IDataStore = new CloudDataStore("qfeedbackme");
+var dataStore: IDataStore = new CloudDataStore("TODO");
 
 describe('basic-tests', function () {
 

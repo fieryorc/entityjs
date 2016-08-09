@@ -78,12 +78,12 @@ export interface IDataStore {
     /**
      * Insert entity into the store.
      */
-    insert(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
+    insert(data: IEntityData): Promise<IEntityData>;
 
     /**
      * Save the entity into the store.
      */
-    save(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
+    save(data: IEntityData): Promise<IEntityData>;
 
     /**
      * Query for entities.
@@ -199,12 +199,12 @@ export interface IDataContextExtended extends IDataContext {
     /**
      * Insert entity into the store.
      */
-    _insert(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
+    _insert(data: IEntityData): Promise<IEntityData>;
 
     /**
      * Save the entity into the store.
      */
-    _save(key: IEntityKey, data: IEntityData): Promise<IEntityData>;
+    _save(data: IEntityData): Promise<IEntityData>;
 }
 
 export interface IStorageEntityPrivate extends IEntityPrivate {
@@ -452,7 +452,7 @@ export abstract class StorageEntity extends Entity {
         
         var key = this.getDataContext()._key(this);
         var data = this.getDataContext()._data(this);
-        var promise = overwrite ? this.getDataContext()._save(key, data) : this.getDataContext()._insert(key, data);
+        var promise = overwrite ? this.getDataContext()._save(data) : this.getDataContext()._insert(data);
         return promise
             .then((v: IEntityData) => {
                 if (!v) {

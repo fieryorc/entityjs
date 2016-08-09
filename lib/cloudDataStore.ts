@@ -153,12 +153,12 @@ export class CloudDataStore implements IDataStore {
             });;
     }
 
-    public insert(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
-        return this.doInsert(<ICloudEntityKey>key, data, false);
+    public insert(data: IEntityData): Promise<IEntityData> {
+        return this.doInsert(data, false);
     }
 
-    public save(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
-        return this.doInsert(<ICloudEntityKey>key, data, true)
+    public save(data: IEntityData): Promise<IEntityData> {
+        return this.doInsert(data, true)
     }
 
     public query<T>(builder: IQueryBuilder): Promise<IEntityData[]> {
@@ -213,19 +213,20 @@ export class CloudDataStore implements IDataStore {
         return this.transaction.promise;
     }
 
-    private doInsert(key: ICloudEntityKey, data: IEntityData, overwrite: boolean): Promise<ICloudEntityData> {
+    private doInsert(data: IEntityData, overwrite: boolean): Promise<ICloudEntityData> {
+        var key: ICloudEntityKey = <ICloudEntityKey>data.key;
         var id = key.key;
         var storeKey = this.store.key(id ? [key.kind, id] : key.kind);
         var keyStr = JSON.stringify(key);
         var insertPromise = Promise.promisify(overwrite ? this.store.upsert : this.store.insert,
             { context: this.store });
         // TODO: Check return values.
-        return <any>insertPromise({ key: storeKey, data: data })
+        return <any>insertPromise({ key: storeKey, data: data.data })
             .then(v => {
                 if (!v) {
                     return null;
                 }
-                
+
                 var savedKey = <ICloudEntityKey>{
                     key: storeKey.id || storeKey.name,
                     kind: storeKey.kind,
@@ -238,6 +239,10 @@ export class CloudDataStore implements IDataStore {
                 };
             })
             .catch(err => {
+                if (err.code == 400) {
+                    return null;
+                }
+
                 throw this.convertError(err);
             });
     }

@@ -76,11 +76,13 @@ export class InMemoryDataStore implements IDataStore {
     }
 
     public del(key: IEntityKey): Promise<void> {
-        if (!(key.stringValue in this.db)) {
-            return Promise.reject(`InMemoryDataStore.del(): Entity with ${key.stringValue} not found.`);
+        if (key.stringValue in this.db) {
+            delete this.db[key.stringValue];
+            return Promise.resolve();
+        } else {
+            // return Promise.reject(`InMemoryDataStore.del(): Entity with ${key.stringValue} not found.`);
+            return Promise.resolve();
         }
-        delete this.db[key.stringValue];
-        return Promise.resolve();
     }
 
     public get(key: IEntityKey): Promise<IEntityData> {
@@ -90,12 +92,12 @@ export class InMemoryDataStore implements IDataStore {
         return Promise.resolve(this.db[key.stringValue]);
     }
 
-    public insert(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
-        return this.doInsert(key, data, false);
+    public insert(data: IEntityData): Promise<IEntityData> {
+        return this.doInsert(data, false);
     }
 
-    public save(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
-        return this.doInsert(key, data, true);
+    public save(data: IEntityData): Promise<IEntityData> {
+        return this.doInsert(data, true);
     }
 
     public query<T>(builder: IQueryBuilder): Promise<IEntityData[]> {
@@ -129,7 +131,8 @@ export class InMemoryDataStore implements IDataStore {
         return Promise.resolve();
     }
 
-    private doInsert(key: IEntityKey, data: IEntityData, overwrite: boolean): Promise<IEntityData> {
+    private doInsert(data: IEntityData, overwrite: boolean): Promise<IEntityData> {
+        var key = data.key;
         return new Promise<IEntityData>((resolve, reject) => {
             if (!overwrite && (key.stringValue in this.db)) {
                 resolve(null);

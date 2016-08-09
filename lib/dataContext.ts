@@ -174,8 +174,9 @@ class DataContext implements IDataContextExtended {
             });
     }
 
-    public _insert(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
-        return this._store.insert(key, data)
+    public _insert(data: IEntityData): Promise<IEntityData> {
+        var key = data.key;
+        return this._store.insert(data)
             .then((v: IEntityData) => {
                 if (this._dataCache && v) {
                     this._dataCache.set(key.stringValue, data);
@@ -184,8 +185,9 @@ class DataContext implements IDataContextExtended {
             });
     }
 
-    public _save(key: IEntityKey, data: IEntityData): Promise<IEntityData> {
-        return this._store.save(key, data)
+    public _save(data: IEntityData): Promise<IEntityData> {
+        var key = data.key;
+        return this._store.save(data)
             .then((v) => {
                 if (this._dataCache) {
                     this._dataCache.set(key.stringValue, data);
