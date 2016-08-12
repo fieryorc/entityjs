@@ -18,7 +18,7 @@ import {
     BugEntity,
     BugStates
 } from "./testEntities";
-import { ITestContext, TestInMemoryContext, TestCloudStoreContext } from "./test-context";
+import { ITestContext, TestInMemoryContext, TestCloudStoreContext } from "./testContext";
 
 export function BasicTests(config: string, createContext: () => Promise<ITestContext>) {
     var should = chai.should();

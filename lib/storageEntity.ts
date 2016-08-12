@@ -320,6 +320,7 @@ export abstract class StorageEntity extends Entity {
 
         this.getPrivate().loadingPromise = promise
             .then(v => {
+                this.getPrivate().loadingPromise = null;
                 if (!v) {
                     this.setState(EntityState.NOT_LOADED);
                     return false;

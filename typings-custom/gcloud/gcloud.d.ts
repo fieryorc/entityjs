@@ -52,11 +52,13 @@ declare module GCloud {
         }
 
         interface ITransaction {
+            run(callabck: (err: any) => void): void;
+            commit(callabck: (err: any) => void): void;
+            rollback(callback: (err: any) => void): void;
             allocateIds(incompleteKey: IKey, n: number, callback: (err: Object, keys: IKey[], apiResponse: any) => void): void;
             delete(key: IKey | IKey[]): void;
             get(keys: IKey | IKey[], callback: (err: any, entity: any | any[]) => void): void;
             insert<T>(entity: IEntity<T>): void;
-            rollback(callback: (err: any, apiResponse: any) => void): void;
             runQuery(q: IQuery, callabck: (err: any, entities: any[], nextQuery: IQuery, apiResponse: any) => void): void;
             save(entities: { key: IKey, data: any | any[] } | { key: IKey, data: any | any[] }[]): void;
             update(entities: { key: IKey, data: any | any[] } | { key: IKey, data: any | any[] }[]): void;
@@ -96,7 +98,7 @@ declare module GCloud {
             get(keys: IKey | IKey[], callback: (err: any, entity: any | any[]) => void): void;
             insert<T>(entity: IEntity<T>, callback: (...args: any[]) => void): void;
             int(value: number): any;
-            runInTransaction(fn: (transaction: ITransaction, done: () => void) => void, callback: (err: any) => void): void;
+            transaction(): ITransaction;
             runQuery<TEntityData>(q: IQuery, callback: (err: any, entities: IEntity<TEntityData>[], nextQuery: IQuery, apiResponse: any) => void): void;
             runQuery<TEntityData>(q: IQuery): IStream<IEntity<TEntityData>>;
             save<TEntityData>(entities: IEntity<TEntityData> | IEntity<TEntityData>[], callback: (err: any, apiResponse: any) => void): void;
@@ -107,7 +109,7 @@ declare module GCloud {
     }
 }
 
-declare module "gcloud" {
+declare module "google-cloud" {
     export = gcloud;
 }
 

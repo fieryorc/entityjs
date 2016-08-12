@@ -1,4 +1,4 @@
-import * as gcloud from "gcloud";
+import * as gcloud from "google-cloud";
 import * as Promise from "bluebird";
 import { IDataContext,
     IEntityData,
@@ -39,7 +39,6 @@ interface ICloudQueryBuilder extends IQueryBuilder {
 
 interface ICloudTransaction {
     transaction: GCloud.Datastore.ITransaction;
-    done: () => void;
     promise: Promise<void>;
 }
 
@@ -133,7 +132,9 @@ export class CloudDataStore implements IDataStore {
     }
 
     public del(key: IEntityKey): Promise<void> {
-        var delPromise = Promise.promisify(this.store.delete, { context: this.store });
+        var delPromise = Promise.promisify(
+            this.transaction ? this.transaction.transaction.delete : this.store.delete,
+            { context: this.store });
         var cKey: ICloudEntityKey = <ICloudEntityKey>key;
         var storeKey = this.store.key([cKey.kind, cKey.key]);
         return delPromise(storeKey)
@@ -144,7 +145,10 @@ export class CloudDataStore implements IDataStore {
 
     public get(key: IEntityKey): Promise<IEntityData> {
         var cKey: ICloudEntityKey = <ICloudEntityKey>key;
-        var getPromise = Promise.promisify(this.store.get, { context: this.store });
+
+        var getPromise = Promise.promisify(
+            this.transaction ? this.transaction.transaction.get : this.store.get,
+            { context: this.store });
         var storeKey = this.store.key([cKey.kind, cKey.key]);
         return getPromise(storeKey)
             .then(gData => CloudDataStore.convertData(gData))
@@ -163,6 +167,7 @@ export class CloudDataStore implements IDataStore {
 
     public query<T>(builder: IQueryBuilder): Promise<IEntityData[]> {
         var cq = <ICloudQueryBuilder>builder;
+
         var storeQuery = this.store.createQuery(cq._kind);
         cq._filters.forEach((f: IFilter) => {
             if (f.operator) {
@@ -171,7 +176,9 @@ export class CloudDataStore implements IDataStore {
                 storeQuery = storeQuery.filter(f.property, f.value);
             }
         });
-        var queryPromise = Promise.promisify(this.store.runQuery, { context: this.store });
+        var queryPromise = Promise.promisify(
+            this.transaction ? this.transaction.transaction.runQuery : this.store.runQuery,
+            { context: this.store });
         return <any>queryPromise(storeQuery)
             .then((result: any[]) => {
                 var entities: any[] = [];
@@ -184,33 +191,40 @@ export class CloudDataStore implements IDataStore {
 
     public beginTransaction(): Promise<void> {
         this.transaction = <ICloudTransaction>{};
-        return new Promise<void>((resolve, reject) => {
-            var transactionPromise = Promise.promisify(this.store.runInTransaction, { context: this.store });
-            this.transaction.promise = transactionPromise(
-                (tx, done) => {
-                    this.transaction.transaction = tx;
-                    this.transaction.done = done;
-                    resolve();
-                })
-                .then(() => {
-                    // We are here because it completed successfully.
-                    this.transaction = null;
-                })
-                .catch(err => {
-                    this.transaction = null;
-                    throw this.convertError(err);
-                });
-        });
+        this.transaction.transaction = this.store.transaction();
+        var transactionPromise = Promise.promisify(this.transaction.transaction.run, { context: this.transaction.transaction });
+        return transactionPromise()
+            .then(() => {
+                // We are here because transaction started successfully.
+            })
+            .catch(err => {
+                this.transaction = null;
+                throw this.convertError(err);
+            });
     }
 
     public rollbackTransaction(): Promise<void> {
-        this.transaction.transaction.rollback(this.transaction.done);
-        return Promise.resolve();
+        if (!this.transaction) {
+            return Promise.reject(`Can't rollback transaction. Not in transaction.`);
+        }
+
+        var promise = Promise.promisify(this.transaction.transaction.rollback, { context: this.transaction.transaction });
+        return promise()
+            .then(() => {
+                this.transaction = null;
+            });
     }
 
     public commitTransaction(): Promise<void> {
-        this.transaction.done();
-        return this.transaction.promise;
+        if (!this.transaction) {
+            return Promise.reject(`Can't commit transaction. Not in transaction.`);
+        }
+
+        var promise = Promise.promisify(this.transaction.transaction.commit, { context: this.transaction.transaction });
+        return promise()
+            .then(() => {
+                this.transaction = null;
+            })
     }
 
     private doInsert(data: IEntityData, overwrite: boolean): Promise<ICloudEntityData> {
@@ -218,7 +232,10 @@ export class CloudDataStore implements IDataStore {
         var id = key.key;
         var storeKey = this.store.key(id ? [key.kind, id] : key.kind);
         var keyStr = JSON.stringify(key);
-        var insertPromise = Promise.promisify(overwrite ? this.store.upsert : this.store.insert,
+        var insertPromise = Promise.promisify(
+            this.transaction ?
+                (overwrite ? this.transaction.transaction.upsert : this.transaction.transaction.insert)
+                : (overwrite ? this.store.upsert : this.store.insert),
             { context: this.store });
         // TODO: Check return values.
         return <any>insertPromise({ key: storeKey, data: data.data })

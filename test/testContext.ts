@@ -1,6 +1,6 @@
 import * as chai from "chai";
 import * as Promise from "bluebird";
-import * as gcloud from "gcloud";
+import * as gcloud from "google-cloud";
 
 import {
     IDataContext,
@@ -30,8 +30,8 @@ export class TestInMemoryContext implements ITestContext {
     private dataStoreObject: any;
     private dataStore: IDataStore;
 
-    constructor(timeout?: number) {
-        this.dataStoreObject = {};
+    constructor(dataStoreObject: any, timeout?: number) {
+        this.dataStoreObject = dataStoreObject;
         this.dataStore = new InMemoryDataStore(this.dataStoreObject);
         this.context = createDataContext(this.dataStore, timeout);
     }

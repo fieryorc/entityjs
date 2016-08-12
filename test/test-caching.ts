@@ -18,7 +18,7 @@ import {
     BugEntity,
     BugStates
 } from "./testEntities";
-import { ITestContext, TestInMemoryContext, TestCloudStoreContext } from "./test-context";
+import { ITestContext, TestInMemoryContext, TestCloudStoreContext } from "./testContext";
 var CACHE_TIMEOUT = 20000;
 
 export function CachingTests(config: string, createContext: (cacheTimeout: number) => Promise<ITestContext>) {

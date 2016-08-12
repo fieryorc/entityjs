@@ -1,4 +1,3 @@
-import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
 import { IEntityKey,
     IEntityData,
@@ -17,14 +16,18 @@ import { EntityHelpers } from "./entityHelpers";
 /**
  * Implements Temporary store based on object storage.
  * Any StorageEntity can use this store.
+ * Transaction follows the same semantics as gcloud datastore.
+ *  - Within transaction, the reads are from snapshot (when transaction started).
+ *  - Reads don't see entities added in transaction.
  */
 export class InMemoryDataStore implements IDataStore {
-    private db: CommonTypes.IDictionary<any>;
+    private database: CommonTypes.IDictionary<any>;
+    private snapshot: CommonTypes.IDictionary<any>;
     // backup copy for rolling back transaction.
-    private backup: string;
+    private transactionDb: CommonTypes.IDictionary<any>;
 
     public constructor(obj?: CommonTypes.IDictionary<any>) {
-        this.db = obj || {};
+        this.database = obj || {};
     }
 
     public validate(entity: StorageEntity): void {
@@ -76,8 +79,11 @@ export class InMemoryDataStore implements IDataStore {
     }
 
     public del(key: IEntityKey): Promise<void> {
-        if (key.stringValue in this.db) {
-            delete this.db[key.stringValue];
+        if (this.transactionDb) {
+            this.transactionDb[key.stringValue] = null;
+            return Promise.resolve();
+        } else if (key.stringValue in this.database) {
+            delete this.database[key.stringValue];
             return Promise.resolve();
         } else {
             // return Promise.reject(`InMemoryDataStore.del(): Entity with ${key.stringValue} not found.`);
@@ -86,10 +92,12 @@ export class InMemoryDataStore implements IDataStore {
     }
 
     public get(key: IEntityKey): Promise<IEntityData> {
-        if (!(key.stringValue in this.db)) {
+        // If in transaction, return from snapshot.
+        var db = this.snapshot || this.database;
+        if (!(key.stringValue in db)) {
             return Promise.resolve(null);
         }
-        return Promise.resolve(this.db[key.stringValue]);
+        return Promise.resolve(db[key.stringValue]);
     }
 
     public insert(data: IEntityData): Promise<IEntityData> {
@@ -107,44 +115,53 @@ export class InMemoryDataStore implements IDataStore {
     }
 
     public beginTransaction(): Promise<void> {
-        this.backup = JSON.stringify(this.db);
+        this.snapshot = this.clone(this.database);
+        this.transactionDb = {};
         return Promise.resolve();
     }
 
     public rollbackTransaction(): Promise<void> {
-        if (backupData) {
+        if (!this.transactionDb) {
             return Promise.reject("rollbackTransaction(): Can't rollback when not inside transaction.");
         }
 
-        var backupData = JSON.parse(this.backup);
-        for (var key in this.db) {
-            delete this.db[key];
-        }
-        for (var key in backupData) {
-            this.db[key] = backupData[key];
-        }
+        this.transactionDb = this.snapshot = null;
         return Promise.resolve();
     }
 
     public commitTransaction(): Promise<void> {
-        this.backup = null;
+        for (var key in this.transactionDb) {
+            if (!this.transactionDb[key]) {
+                delete this.database[key];
+            } else {
+                this.database[key] = this.transactionDb[key];
+            }
+        }
+
+        this.transactionDb = this.snapshot = null;
         return Promise.resolve();
     }
 
     private doInsert(data: IEntityData, overwrite: boolean): Promise<IEntityData> {
         var key = data.key;
+        var db = this.transactionDb || this.database;
+
         return new Promise<IEntityData>((resolve, reject) => {
-            if (!overwrite && (key.stringValue in this.db)) {
+            if (!overwrite && (key.stringValue in db)) {
                 resolve(null);
                 return;
             }
 
             // Normalize the data (strip out any functions, other misc stufff) before storing.
-            this.db[key.stringValue] = JSON.parse(JSON.stringify(data));
+            db[key.stringValue] = this.clone(data);
             resolve({
                 key: key,
                 data: null
             });
         });
+    }
+
+    private clone(data: any): any {
+        return JSON.parse(JSON.stringify(data));
     }
 }

@@ -15,7 +15,7 @@
   "typings": "index.d.ts",
   "dependencies": {
     "bluebird": "^3.4.1",
-    "gcloud": "^0.36.0",
+    "google-cloud": "^0.38.3",
     "http-status-codes": "^1.0.6",
     "lodash": "^4.13.1"
   },

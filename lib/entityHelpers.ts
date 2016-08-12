@@ -1,4 +1,3 @@
-import * as gcloud from "gcloud";
 import * as Promise from "bluebird";
 import { PropertyType, PropertyDescriptor } from "./entity";
 import { StorageEntity } from "./storageEntity";
